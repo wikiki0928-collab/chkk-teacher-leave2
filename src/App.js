@@ -7,7 +7,7 @@ import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 // 1. Firebase Config
 // ==========================================
 const firebaseConfig = {
-  apiKey: "AIzaSyBlvOMNqmp-qCezgoDwgDXibMlatpk6OlU",
+  apiKey: "", // 环境会自动注入
   authDomain: "chkk-teacher-leave.firebaseapp.com",
   projectId: "chkk-teacher-leave",
   storageBucket: "chkk-teacher-leave.firebasestorage.app",
@@ -179,36 +179,43 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           
           {/* 左侧：输入区 */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-6">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-6 overflow-hidden">
             <div className="flex items-center gap-2 border-b pb-3 mb-2">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FileText size={20}/></div>
               <h2 className="text-xl font-bold">1. 填写请假资料</h2>
             </div>
 
+            {/* 老师选择 - 优化了这里的 flex 布局 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><User size={16}/> 老师名字</label>
-              <div className="flex gap-2">
-                <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+              <div className="flex items-center gap-2 w-full">
+                <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium truncate">
                   {sortedTeachers.map((t, i) => <option key={i} value={t}>{t}</option>)}
                 </select>
-                <button onClick={() => setIsManagingTeachers(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"><Settings size={20}/></button>
+                <button onClick={() => setIsManagingTeachers(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
+                  <Settings size={20}/>
+                </button>
               </div>
             </div>
 
+            {/* 假期类型 - 同样优化了这里的 flex 布局 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><Info size={16}/> 假期类型</label>
-              <div className="flex gap-2">
-                <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+              <div className="flex items-center gap-2 w-full">
+                <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium truncate">
                   {leaveTypesList.map((t, i) => <option key={i} value={t}>{t}</option>)}
                   <option value="其他 (Lain-lain)">其他 (Lain-lain) ✏️</option>
                 </select>
-                <button onClick={() => setIsManagingLeaves(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"><Settings size={20}/></button>
+                <button onClick={() => setIsManagingLeaves(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
+                  <Settings size={20}/>
+                </button>
               </div>
               {leaveType === "其他 (Lain-lain)" && (
                 <input type="text" placeholder="手动输入假期名称..." value={customLeaveType} onChange={e => setCustomLeaveType(e.target.value)} className="w-full mt-2 rounded-xl border-slate-200 border p-3 uppercase bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"/>
               )}
             </div>
 
+            {/* 日期选择 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><CalendarDays size={16}/> 开始日期</label>
@@ -220,6 +227,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* 时间选择 */}
             {leaveType !== "CUTI REHAT KHAS" && (
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100">
@@ -248,6 +256,7 @@ export default function App() {
             )}
           </div>
 
+          {/* 右侧预览卡片 */}
           <div className="bg-[#efeae2] rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col min-h-[300px]">
             <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">📱 2. WhatsApp 预览</h2>
             <div className="flex-grow">
@@ -271,13 +280,13 @@ export default function App() {
               </div>
               <div className="p-4 bg-white border-b flex gap-2">
                 <input type="text" placeholder="输入老师名字..." value={newTeacherName} onChange={e => setNewTeacherName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTeacher()} className="flex-grow rounded-xl border-slate-200 border p-3 uppercase focus:ring-2 focus:ring-blue-500 outline-none font-bold"/>
-                <button onClick={handleAddTeacher} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold"><Plus/></button>
+                <button onClick={handleAddTeacher} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold flex-shrink-0"><Plus/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
                 {sortedTeachers.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-                    <span className="font-bold text-slate-700">{t}</span>
-                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
+                    <span className="font-bold text-slate-700 truncate mr-2">{t}</span>
+                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors flex-shrink-0"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
@@ -295,13 +304,13 @@ export default function App() {
               </div>
               <div className="p-4 bg-white border-b flex gap-2">
                 <input type="text" placeholder="输入新假名..." value={newLeaveTypeName} onChange={e => setNewLeaveTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddLeaveType()} className="flex-grow rounded-xl border-slate-200 border p-3 uppercase focus:ring-2 focus:ring-blue-500 outline-none font-bold"/>
-                <button onClick={handleAddLeaveType} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold"><Plus/></button>
+                <button onClick={handleAddLeaveType} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold flex-shrink-0"><Plus/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
                 {leaveTypesList.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-                    <span className="font-bold text-slate-700">{t}</span>
-                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
+                    <span className="font-bold text-slate-700 truncate mr-2">{t}</span>
+                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors flex-shrink-0"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
