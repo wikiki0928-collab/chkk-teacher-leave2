@@ -79,6 +79,15 @@ export default function App() {
     }
   };
 
+  const handleRemoveTeacher = (nameToRemove) => {
+    const newList = teachersList.filter(n => n !== nameToRemove);
+    setTeachersList(newList);
+    syncTeachersToCloud(newList);
+    if (selectedTeacher === nameToRemove) {
+      setSelectedTeacher(newList.length > 0 ? [...newList].sort((a, b) => a.localeCompare(b))[0] : "");
+    }
+  };
+
   const handleAddLeaveType = () => {
     const name = newLeaveTypeName.trim().toUpperCase();
     if (name && !leaveTypesList.includes(name)) {
@@ -87,17 +96,22 @@ export default function App() {
     }
   };
 
-  // 核心逻辑：计算排除周末的工作日天数
+  const handleRemoveLeaveType = (nameToRemove) => {
+    const newList = leaveTypesList.filter(n => n !== nameToRemove);
+    setLeaveTypesList(newList);
+    syncLeavesToCloud(newList);
+    if (leaveType === nameToRemove) {
+      setLeaveType(newList.length > 0 ? newList[0] : "其他 (Lain-lain)");
+    }
+  };
+
   const countWorkDays = (start, end) => {
     let count = 0;
     let curDate = new Date(start);
     const stopDate = new Date(end);
     while (curDate <= stopDate) {
       const dayOfWeek = curDate.getDay();
-      // 0 = Sunday, 6 = Saturday
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        count++;
-      }
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
       curDate.setDate(curDate.getDate() + 1);
     }
     return count;
@@ -121,16 +135,11 @@ export default function App() {
       return `${p[2]}.${p[1]}.${p[0]}`;
     };
     const datePart = startDate !== endDate ? `${format(startDate)} - ${format(endDate)}` : format(startDate);
-    
     let finalStr = datePart;
-
-    // 特殊逻辑：针对 CUTI REHAT KHAS 计算天数（扣除周末）
     if (leaveType === "CUTI REHAT KHAS") {
       const days = countWorkDays(startDate, endDate);
       finalStr += ` (${days} HARI)`;
     }
-
-    // 时间处理逻辑 (非 CRK 且开启了时间)
     if (useTime && leaveType !== "CUTI REHAT KHAS") {
       const startStr = formatTimeTo12h(startTime);
       const endStr = isSelesai ? "SELESAI" : formatTimeTo12h(endTime);
@@ -176,7 +185,6 @@ export default function App() {
               <h2 className="text-xl font-bold">1. 填写请假资料</h2>
             </div>
 
-            {/* 老师选择 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><User size={16}/> 老师名字</label>
               <div className="flex gap-2">
@@ -187,7 +195,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 假期类型 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><Info size={16}/> 假期类型</label>
               <div className="flex gap-2">
@@ -202,7 +209,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 日期选择 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><CalendarDays size={16}/> 开始日期</label>
@@ -214,14 +220,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* 时间选择 */}
             {leaveType !== "CUTI REHAT KHAS" && (
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100">
                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><Clock size={16}/> 添加具体时间 (Optional)</div>
                    <input type="checkbox" checked={useTime} onChange={e => setUseTime(e.target.checked)} className="w-5 h-5 accent-blue-600 cursor-pointer"/>
                 </div>
-
                 {useTime && (
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 animate-in fade-in slide-in-from-top-2">
                     <div className="grid grid-cols-2 gap-4">
@@ -231,14 +235,12 @@ export default function App() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase">结束时间</label>
-                        <div className="flex items-center gap-2">
-                           <input type="time" disabled={isSelesai} value={endTime} onChange={e => setEndTime(e.target.value)} className={`w-full p-2 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold ${isSelesai ? 'opacity-30' : ''}`}/>
-                        </div>
+                        <input type="time" disabled={isSelesai} value={endTime} onChange={e => setEndTime(e.target.value)} className={`w-full p-2 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold ${isSelesai ? 'opacity-30' : ''}`}/>
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:bg-white/80 transition-colors">
+                    <label className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:bg-white/80 transition-colors font-bold text-xs">
                       <input type="checkbox" checked={isSelesai} onChange={e => setIsSelesai(e.target.checked)} className="w-4 h-4 accent-orange-500"/>
-                      <span className="text-xs font-bold text-slate-600">直到活动结束 (SELESAI)</span>
+                      直到活动结束 (SELESAI)
                     </label>
                   </div>
                 )}
@@ -246,25 +248,20 @@ export default function App() {
             )}
           </div>
 
-          {/* 右侧：预览区 */}
-          <div className="space-y-6">
-            <div className="bg-[#efeae2] rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col min-h-[300px]">
-              <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">
-                <span className="text-2xl">📱</span> 2. WhatsApp 预览
-              </h2>
-              <div className="flex-grow">
-                <div className="bg-[#d9fdd3] text-[#111b21] p-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] leading-relaxed whitespace-pre-wrap font-semibold inline-block max-w-full">
-                  {groupOutputText}
-                </div>
+          <div className="bg-[#efeae2] rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col min-h-[300px]">
+            <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">📱 2. WhatsApp 预览</h2>
+            <div className="flex-grow">
+              <div className="bg-[#d9fdd3] text-[#111b21] p-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] leading-relaxed whitespace-pre-wrap font-semibold inline-block max-w-full">
+                {groupOutputText}
               </div>
-              <button onClick={copyToClipboard} className={`w-full mt-6 py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-95 ${copiedGroupMsg ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                {copiedGroupMsg ? <><CheckCircle2/> 已复制！</> : <><ClipboardCopy/> 复制短信息</>}
-              </button>
             </div>
+            <button onClick={copyToClipboard} className={`w-full mt-6 py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-95 ${copiedGroupMsg ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+              {copiedGroupMsg ? <><CheckCircle2/> 已复制！</> : <><ClipboardCopy/> 复制短信息</>}
+            </button>
           </div>
         </div>
 
-        {/* 管理 Modal - 老师 */}
+        {/* Modal: 老师 */}
         {isManagingTeachers && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
@@ -280,7 +277,7 @@ export default function App() {
                 {sortedTeachers.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
                     <span className="font-bold text-slate-700">{t}</span>
-                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={20}/></button>
+                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
@@ -288,7 +285,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 管理 Modal - 假期 */}
+        {/* Modal: 假期 */}
         {isManagingLeaves && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
@@ -304,7 +301,7 @@ export default function App() {
                 {leaveTypesList.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
                     <span className="font-bold text-slate-700">{t}</span>
-                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={20}/></button>
+                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
