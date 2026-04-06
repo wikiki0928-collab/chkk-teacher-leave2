@@ -4,10 +4,10 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // ==========================================
-// 1. Firebase Config
+// 1. Firebase Config (已补回关键的 API Key)
 // ==========================================
 const firebaseConfig = {
-  apiKey: "", // 环境会自动注入
+  apiKey: "AIzaSyBlvOMNqmp-qCezgoDwgDXibMlatpk6OlU",
   authDomain: "chkk-teacher-leave.firebaseapp.com",
   projectId: "chkk-teacher-leave",
   storageBucket: "chkk-teacher-leave.firebasestorage.app",
@@ -18,7 +18,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
-const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SAY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
+const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SAY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIN RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
 export default function App() {
@@ -185,28 +185,42 @@ export default function App() {
               <h2 className="text-xl font-bold">1. 填写请假资料</h2>
             </div>
 
-            {/* 老师选择 - 优化了这里的 flex 布局 */}
+            {/* 老师选择 - 优化了这里的对齐 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><User size={16}/> 老师名字</label>
               <div className="flex items-center gap-2 w-full">
-                <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium truncate">
+                <select 
+                  value={selectedTeacher} 
+                  onChange={e => setSelectedTeacher(e.target.value)} 
+                  className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                >
                   {sortedTeachers.map((t, i) => <option key={i} value={t}>{t}</option>)}
                 </select>
-                <button onClick={() => setIsManagingTeachers(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
+                <button 
+                  onClick={() => setIsManagingTeachers(true)} 
+                  className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0"
+                >
                   <Settings size={20}/>
                 </button>
               </div>
             </div>
 
-            {/* 假期类型 - 同样优化了这里的 flex 布局 */}
+            {/* 假期类型 - 优化了这里的对齐 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><Info size={16}/> 假期类型</label>
               <div className="flex items-center gap-2 w-full">
-                <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium truncate">
+                <select 
+                  value={leaveType} 
+                  onChange={e => setLeaveType(e.target.value)} 
+                  className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                >
                   {leaveTypesList.map((t, i) => <option key={i} value={t}>{t}</option>)}
                   <option value="其他 (Lain-lain)">其他 (Lain-lain) ✏️</option>
                 </select>
-                <button onClick={() => setIsManagingLeaves(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
+                <button 
+                  onClick={() => setIsManagingLeaves(true)} 
+                  className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0"
+                >
                   <Settings size={20}/>
                 </button>
               </div>
@@ -256,7 +270,7 @@ export default function App() {
             )}
           </div>
 
-          {/* 右侧预览卡片 */}
+          {/* 右侧：预览区 */}
           <div className="bg-[#efeae2] rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col min-h-[300px]">
             <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">📱 2. WhatsApp 预览</h2>
             <div className="flex-grow">
@@ -280,13 +294,13 @@ export default function App() {
               </div>
               <div className="p-4 bg-white border-b flex gap-2">
                 <input type="text" placeholder="输入老师名字..." value={newTeacherName} onChange={e => setNewTeacherName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTeacher()} className="flex-grow rounded-xl border-slate-200 border p-3 uppercase focus:ring-2 focus:ring-blue-500 outline-none font-bold"/>
-                <button onClick={handleAddTeacher} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold flex-shrink-0"><Plus/></button>
+                <button onClick={handleAddTeacher} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold"><Plus/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
                 {sortedTeachers.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-                    <span className="font-bold text-slate-700 truncate mr-2">{t}</span>
-                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors flex-shrink-0"><Trash2 size={20}/></button>
+                    <span className="font-bold text-slate-700">{t}</span>
+                    <button onClick={() => handleRemoveTeacher(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
@@ -304,13 +318,13 @@ export default function App() {
               </div>
               <div className="p-4 bg-white border-b flex gap-2">
                 <input type="text" placeholder="输入新假名..." value={newLeaveTypeName} onChange={e => setNewLeaveTypeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddLeaveType()} className="flex-grow rounded-xl border-slate-200 border p-3 uppercase focus:ring-2 focus:ring-blue-500 outline-none font-bold"/>
-                <button onClick={handleAddLeaveType} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold flex-shrink-0"><Plus/></button>
+                <button onClick={handleAddLeaveType} className="bg-blue-600 text-white px-5 rounded-xl hover:bg-blue-700 font-bold"><Plus/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-slate-50">
                 {leaveTypesList.map((t, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-                    <span className="font-bold text-slate-700 truncate mr-2">{t}</span>
-                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors flex-shrink-0"><Trash2 size={20}/></button>
+                    <span className="font-bold text-slate-700">{t}</span>
+                    <button onClick={() => handleRemoveLeaveType(t)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 size={20}/></button>
                   </div>
                 ))}
               </div>
