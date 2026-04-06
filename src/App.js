@@ -4,7 +4,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // ==========================================
-// 1. Firebase Config (已补回关键的 API Key)
+// 1. Firebase Config
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyBlvOMNqmp-qCezgoDwgDXibMlatpk6OlU",
@@ -148,7 +148,8 @@ export default function App() {
     return finalStr;
   };
 
-  const generateGroupMessage = () => `${selectedTeacher}\n${getFinalLeaveType()}\n${getDateLine()}`;
+  // 生成短信息，对名字使用 Telegram/WhatsApp 通用的 ** 加粗格式
+  const generateGroupMessage = () => `**${selectedTeacher}**\n${getFinalLeaveType()}\n${getDateLine()}`;
   const groupOutputText = generateGroupMessage();
 
   const copyToClipboard = () => {
@@ -166,7 +167,6 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 py-8 px-4 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* Header */}
         <div className="text-center relative mb-10">
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">老师请假通知生成器</h1>
           <p className="text-slate-500 mt-2 font-medium">快速生成行政通知 · 智能天数计算</p>
@@ -177,50 +177,32 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          
-          {/* 左侧：输入区 */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-6 overflow-hidden">
             <div className="flex items-center gap-2 border-b pb-3 mb-2">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FileText size={20}/></div>
               <h2 className="text-xl font-bold">1. 填写请假资料</h2>
             </div>
 
-            {/* 老师选择 - 优化了这里的对齐 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><User size={16}/> 老师名字</label>
               <div className="flex items-center gap-2 w-full">
-                <select 
-                  value={selectedTeacher} 
-                  onChange={e => setSelectedTeacher(e.target.value)} 
-                  className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-                >
+                <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium">
                   {sortedTeachers.map((t, i) => <option key={i} value={t}>{t}</option>)}
                 </select>
-                <button 
-                  onClick={() => setIsManagingTeachers(true)} 
-                  className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0"
-                >
+                <button onClick={() => setIsManagingTeachers(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
                   <Settings size={20}/>
                 </button>
               </div>
             </div>
 
-            {/* 假期类型 - 优化了这里的对齐 */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><Info size={16}/> 假期类型</label>
               <div className="flex items-center gap-2 w-full">
-                <select 
-                  value={leaveType} 
-                  onChange={e => setLeaveType(e.target.value)} 
-                  className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-                >
+                <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 min-w-0 rounded-xl border-slate-200 border p-3 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none font-medium">
                   {leaveTypesList.map((t, i) => <option key={i} value={t}>{t}</option>)}
                   <option value="其他 (Lain-lain)">其他 (Lain-lain) ✏️</option>
                 </select>
-                <button 
-                  onClick={() => setIsManagingLeaves(true)} 
-                  className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0"
-                >
+                <button onClick={() => setIsManagingLeaves(true)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors flex-shrink-0">
                   <Settings size={20}/>
                 </button>
               </div>
@@ -229,7 +211,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 日期选择 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600 flex items-center gap-2"><CalendarDays size={16}/> 开始日期</label>
@@ -241,7 +222,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 时间选择 */}
             {leaveType !== "CUTI REHAT KHAS" && (
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100">
@@ -270,9 +250,8 @@ export default function App() {
             )}
           </div>
 
-          {/* 右侧：预览区 */}
           <div className="bg-[#efeae2] rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col min-h-[300px]">
-            <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">📱 2. WhatsApp 预览</h2>
+            <h2 className="text-xl font-bold text-slate-800 pb-3 mb-6 border-b border-slate-300/50 flex items-center gap-2">📱 2. 预览 (WhatsApp/TG)</h2>
             <div className="flex-grow">
               <div className="bg-[#d9fdd3] text-[#111b21] p-4 rounded-2xl rounded-tl-none shadow-sm text-[15px] leading-relaxed whitespace-pre-wrap font-semibold inline-block max-w-full">
                 {groupOutputText}
