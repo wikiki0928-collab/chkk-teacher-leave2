@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search } from 'lucide-react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -21,11 +21,10 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
-// 基础名单库 (防白屏兜底)
+// 基础名单库
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
-// 纯函数：计算工作日 (扣除周六日)
 const countWorkDays = (start, end) => {
   let count = 0; let cur = new Date(start); const stop = new Date(end);
   while (cur <= stop) { 
@@ -37,7 +36,7 @@ const countWorkDays = (start, end) => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'stats' | 'pdf'
+  const [activeTab, setActiveTab] = useState('leave'); 
 
   // UI 辅助状态
   const [toastMsg, setToastMsg] = useState("");
@@ -69,7 +68,7 @@ export default function App() {
   const [isSelesai, setIsSelesai] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
 
-  // 统计系统状态 (大表盘)
+  // 统计系统状态
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
   const [statSearch, setStatSearch] = useState("");
 
@@ -77,6 +76,7 @@ export default function App() {
   const [pdfImages, setPdfImages] = useState([]);
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
 
   // 1. 初始化 安全认证
   useEffect(() => {
@@ -89,7 +89,6 @@ export default function App() {
         }
         setAuthError(false);
       } catch (e) { 
-        console.error("Auth Error", e); 
         setAuthError(true);
         setIsSyncing(false); 
       }
@@ -127,8 +126,9 @@ export default function App() {
     return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
   }, [user]);
 
-  // 3. 加载 PDF 引擎
+  // 3. 动态加载外部引擎 (PDF.js 和 JSZip)
   useEffect(() => {
+    // 加载 PDF 引擎
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -138,6 +138,13 @@ export default function App() {
       };
       document.body.appendChild(script);
     } else { setPdfjsLoaded(true); }
+
+    // 加载 ZIP 引擎
+    if (!window.JSZip) {
+      const scriptZip = document.createElement('script');
+      scriptZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+      document.body.appendChild(scriptZip);
+    }
   }, []);
 
   // 4. 请假逻辑与处理
@@ -158,7 +165,6 @@ export default function App() {
     const f = (d) => d.split("-").reverse().join(".");
     const datePart = startDate !== endDate ? `${f(startDate)} - ${f(endDate)}` : f(startDate);
     let res = datePart;
-    // CRK 或者含有 REHAT字眼的假期都自动计算天数
     if (leaveType.includes("CUTI REHAT") || leaveType.includes("CUTI SAKIT")) {
       res += ` (${countWorkDays(startDate, endDate)} HARI)`;
     } else if (useTime) {
@@ -221,25 +227,18 @@ export default function App() {
 
   const allTeachersStats = useMemo(() => {
     const statsMap = {};
-    
-    // 初始化全校老师数据骨架
     sortedTeachers.forEach(t => {
       statsMap[t] = { name: t, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
     });
 
     historyRecords.forEach(rec => {
-      // 1. 抓取年份匹配
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
       if (!dateMatch) return; 
       if (dateMatch[3] !== statYear) return;
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) {
-        // 万一老师已经被移出主力名单，但历史里还有他，也得加进来显示
-        statsMap[tName] = { name: tName, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
-      }
+      if (!statsMap[tName]) statsMap[tName] = { name: tName, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
 
-      // 2. 智能抓取天数 (支持 (X HARI) 格式 或 日期相减)
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
       if (daysMatch) {
@@ -253,31 +252,23 @@ export default function App() {
         }
       }
 
-      // 3. 分类归总
       const type = rec.type.toUpperCase();
-      if (type.includes("REHAT KHAS") || type === "CRK") {
-        statsMap[tName].CRK_days += days;
-      } else if (type.includes("CUTI REHAT")) {
-        statsMap[tName].CR_days += days;
-      } else if (type.includes("SAKIT")) {
-        statsMap[tName].SAKIT_days += days;
-      } else if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) {
-        statsMap[tName].TIMESLIP_times += 1;
-      } else {
-        statsMap[tName].OTHER_times += 1;
-      }
+      if (type.includes("REHAT KHAS") || type === "CRK") statsMap[tName].CRK_days += days;
+      else if (type.includes("CUTI REHAT")) statsMap[tName].CR_days += days;
+      else if (type.includes("SAKIT")) statsMap[tName].SAKIT_days += days;
+      else if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) statsMap[tName].TIMESLIP_times += 1;
+      else statsMap[tName].OTHER_times += 1;
     });
 
     return Object.values(statsMap).sort((a, b) => a.name.localeCompare(b.name));
   }, [historyRecords, statYear, sortedTeachers]);
 
-  // 根据搜索框过滤显示的名单
   const filteredStats = useMemo(() => {
     if (!statSearch) return allTeachersStats;
     return allTeachersStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
   }, [allTeachersStats, statSearch]);
 
-  // 6. PDF 转换逻辑
+  // 6. PDF 转换与打包逻辑
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') return;
@@ -301,7 +292,7 @@ export default function App() {
           await page.render({ canvasContext: context, viewport: viewport }).promise;
           images.push(canvas.toDataURL('image/jpeg', 0.95)); 
         }
-        setPdfImages(images); setIsConverting(false); showToast("✅ PDF 转换完成！");
+        setPdfImages(images); setIsConverting(false); showToast(`✅ 成功转换 ${pdf.numPages} 页！`);
       };
       reader.readAsArrayBuffer(file);
     } catch (error) { setIsConverting(false); showToast("❌ 转换失败，文件可能损坏。"); }
@@ -311,6 +302,44 @@ export default function App() {
     const link = document.createElement('a'); link.href = dataUrl;
     link.download = `公函_第${index + 1}页.jpg`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  // 核心：一键打包 ZIP 功能
+  const downloadAllAsZip = async () => {
+    if (!window.JSZip) {
+      return showToast("⏳ 压缩引擎加载中，请稍等...");
+    }
+    
+    setIsZipping(true);
+    try {
+      const zip = new window.JSZip();
+      
+      // 把所有 base64 图片塞进压缩包
+      pdfImages.forEach((dataUrl, index) => {
+        const base64Data = dataUrl.split(',')[1];
+        zip.file(`公函_第${index + 1}页.jpg`, base64Data, { base64: true });
+      });
+
+      // 生成 ZIP 文件并下载
+      const content = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      
+      // 生成带有时间戳的文件名防止重复
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `公函图片包_${dateStr}.zip`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast("✅ 全部页面已成功打包下载！");
+    } catch (error) {
+      console.error(error);
+      showToast("❌ 打包失败");
+    } finally {
+      setIsZipping(false);
+    }
   };
 
   return (
@@ -363,7 +392,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.1</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.2</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端连线正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
@@ -575,10 +604,22 @@ export default function App() {
 
             {pdfImages.length > 0 && (
               <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 space-y-8 animate-in zoom-in-95">
-                <div className="flex items-center justify-between border-b pb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-6 gap-4">
                   <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                     <CheckCircle2 className="text-green-500"/> 转换成功 ({pdfImages.length} 页)
                   </h3>
+                  
+                  {/* 一键打包 ZIP 按钮 */}
+                  {pdfImages.length > 1 && (
+                    <button 
+                      onClick={downloadAllAsZip}
+                      disabled={isZipping}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-white transition-all shadow-md ${isZipping ? 'bg-slate-400' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
+                    >
+                      {isZipping ? <Loader2 size={18} className="animate-spin" /> : <Archive size={18} />}
+                      {isZipping ? '正在打包压缩...' : '一键打包下载 (ZIP)'}
+                    </button>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -590,7 +631,7 @@ export default function App() {
                            onClick={() => downloadImage(imgSrc, index)}
                            className="flex items-center gap-1.5 text-xs font-black bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
                          >
-                           <Download size={14}/> 下载此页
+                           <Download size={14}/> 单张下载
                          </button>
                       </div>
                       <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-white">
