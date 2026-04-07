@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage } from 'lucide-react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -26,7 +26,18 @@ const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YON
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('leave'); 
+  const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'stats' | 'pdf'
+
+  // =====================================
+  // UI 辅助状态 (取代原有的 alert 和 confirm)
+  // =====================================
+  const [toastMsg, setToastMsg] = useState("");
+  const [recordToDelete, setRecordToDelete] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 3000);
+  };
 
   // =====================================
   // 请假系统状态
@@ -52,6 +63,12 @@ export default function App() {
   const [endTime, setEndTime] = useState("10:00");
   const [isSelesai, setIsSelesai] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
+
+  // =====================================
+  // 统计分析系统状态
+  // =====================================
+  const [statTeacher, setStatTeacher] = useState("");
+  const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
 
   // =====================================
   // PDF 工具状态
@@ -82,19 +99,17 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
-  // 2. 监听云端数据 (修复了致命的段数报错)
+  // 2. 监听云端数据
   useEffect(() => {
     if (!user) return; 
     setIsSyncing(true);
 
-    // 修复点：使用 'app_config' 补齐到 6 个层级，符合 doc() 要求
     const teachersRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'teachers_list');
     const unsubTeachers = onSnapshot(teachersRef, (snap) => {
       if (snap.exists()) setTeachersList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
     }, (err) => {
-      console.error(err);
       setAuthError(true);
       setIsSyncing(false);
     });
@@ -105,7 +120,6 @@ export default function App() {
       else setDoc(snap.ref, { list: rawLeaveTypes });
     }, (err) => console.error(err));
 
-    // 历史记录本来就是集合，5 个层级完全正确
     const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
     const unsubHistory = onSnapshot(qHistory, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -131,13 +145,15 @@ export default function App() {
     }
   }, []);
 
-  // 4. 计算与逻辑处理
+  // 4. 请假逻辑与处理
   const sortedTeachers = useMemo(() => [...teachersList].sort((a, b) => a.localeCompare(b)), [teachersList]);
   
   useEffect(() => {
     if (sortedTeachers.length > 0 && !selectedTeacher) setSelectedTeacher(sortedTeachers[0]);
     if (leaveTypesList.length > 0 && !leaveType) setLeaveType(leaveTypesList[0]);
-  }, [sortedTeachers, leaveTypesList]);
+    // 同时也为统计表赋初值
+    if (sortedTeachers.length > 0 && !statTeacher) setStatTeacher(sortedTeachers[0]);
+  }, [sortedTeachers, leaveTypesList, selectedTeacher, leaveType, statTeacher]);
 
   const countWorkDays = (start, end) => {
     let count = 0; let cur = new Date(start); const stop = new Date(end);
@@ -175,7 +191,10 @@ export default function App() {
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
 
-    if (!user) return;
+    if (!user) {
+      showToast("离线模式：文字已复制，但未能存档到云端！");
+      return;
+    }
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leave_history'), {
@@ -184,24 +203,100 @@ export default function App() {
         dateInfo: getDateLine(),
         createdAt: serverTimestamp()
       });
-    } catch (e) { console.error("History Save Failed", e); }
+      showToast("✅ 已成功复制并存入历史记录！");
+    } catch (e) { 
+      console.error("History Save Failed", e); 
+      showToast("❌ 存档失败，请检查网络！");
+    }
   };
 
-  const deleteRecord = async (id) => {
-    if (!window.confirm("确定要删除这条记录吗？")) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', id));
+  // 确认删除记录核心逻辑
+  const confirmDeleteRecord = async () => {
+    if (!recordToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', recordToDelete.id));
+      showToast("✅ 记录已成功删除");
+    } catch(e) {
+      showToast("❌ 删除失败");
+    } finally {
+      setRecordToDelete(null);
+    }
   };
 
   const updateList = (col, newList) => {
-    if(!user) return alert("请先解决上方的红色连接错误，才能修改云端名单！");
-    // 这里也对应补齐了 6 个层级
+    if(!user) return showToast("❌ 请先解决连接错误，才能修改云端名单！");
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
+  // 5. 统计分析核心算法
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    historyRecords.forEach(rec => {
+      const match = rec.dateInfo.match(/\d{4}/);
+      if (match) years.add(match[0]);
+    });
+    years.add(new Date().getFullYear().toString());
+    return Array.from(years).sort().reverse();
+  }, [historyRecords]);
+
+  const statsData = useMemo(() => {
+    let totalCRKDays = 0;
+    let totalCRKTimes = 0;
+    let totalSakitTimes = 0;
+    let totalOtherTimes = 0;
+
+    const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      CRK_days: 0,
+      CRK_times: 0,
+      SAKIT_times: 0,
+      OTHER_times: 0
+    }));
+
+    historyRecords.forEach(rec => {
+      if (rec.teacher !== statTeacher) return;
+      
+      // 提取日期，匹配 DD.MM.YYYY
+      const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if (!dateMatch) return; 
+
+      const month = parseInt(dateMatch[2], 10);
+      const year = dateMatch[3];
+
+      if (year !== statYear) return; // 只统计选定年份
+
+      const isCRK = rec.type === "CUTI REHAT KHAS";
+      const isSakit = rec.type === "CUTI SAKIT";
+
+      if (isCRK) {
+        // 提取 (X HARI) 里面的天数
+        let days = 1;
+        const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
+        if (daysMatch) {
+          days = parseInt(daysMatch[1], 10);
+        }
+        totalCRKDays += days;
+        totalCRKTimes += 1;
+        monthlyData[month - 1].CRK_days += days;
+        monthlyData[month - 1].CRK_times += 1;
+      } else if (isSakit) {
+        totalSakitTimes += 1;
+        monthlyData[month - 1].SAKIT_times += 1;
+      } else {
+        totalOtherTimes += 1;
+        monthlyData[month - 1].OTHER_times += 1;
+      }
+    });
+
+    return { totalCRKDays, totalCRKTimes, totalSakitTimes, totalOtherTimes, monthlyData };
+  }, [historyRecords, statTeacher, statYear]);
+
+
+  // 6. PDF 转换逻辑
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') return;
-    if (!pdfjsLoaded) return alert('引擎准备中，请稍后再试！');
+    if (!pdfjsLoaded) return showToast('⏳ PDF 引擎准备中，请稍后几秒再试！');
 
     setIsConverting(true); setPdfImages([]);
 
@@ -225,10 +320,11 @@ export default function App() {
         
         setPdfImages(images);
         setIsConverting(false);
+        showToast("✅ PDF 转换完成！");
       };
       reader.readAsArrayBuffer(file);
     } catch (error) {
-      console.error(error); setIsConverting(false); alert("转换失败。");
+      console.error(error); setIsConverting(false); showToast("❌ 转换失败，文件可能已损坏。");
     }
   };
 
@@ -239,21 +335,36 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900 relative">
+      
+      {/* 全局浮动 Toast 提示 */}
+      {toastMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm animate-in slide-in-from-top-4 fade-in">
+          {toastMsg}
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto space-y-6">
         
+        {/* 全局导航栏 */}
         <div className="bg-slate-900 rounded-[32px] p-2 flex gap-2 shadow-xl overflow-x-auto no-scrollbar">
           <button 
             onClick={() => setActiveTab('leave')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-3xl font-black text-sm md:text-base transition-all ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
           >
-            <Briefcase size={20}/> 老师请假系统
+            <Briefcase size={18}/> 请假系统
+          </button>
+          <button 
+            onClick={() => setActiveTab('stats')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+          >
+            <BarChart3 size={18}/> 数据统计
           </button>
           <button 
             onClick={() => setActiveTab('pdf')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-3xl font-black text-sm md:text-base transition-all ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
           >
-            <FileImage size={20}/> PDF转JPG工具
+            <FileImage size={18}/> PDF工具
           </button>
         </div>
 
@@ -265,24 +376,24 @@ export default function App() {
             
             {authError && (
               <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
-                <span className="font-black text-lg flex items-center gap-2">🚨 云端安全锁未开启！(自动开启离线备用模式)</span>
-                <span className="font-bold text-sm text-red-500">不用慌，您依然可以正常使用生成器，只是现在的名单不会与其他设备同步，历史记录也无法存档。要想恢复神同步，请去 Firebase 开启认证功能：</span>
+                <span className="font-black text-lg flex items-center gap-2"><AlertTriangle/> 🚨 云端安全锁未开启！(离线模式)</span>
+                <span className="font-bold text-sm text-red-500">不用慌，您可正常使用生成器，但名单和历史无法同步。要恢复神同步，请去 Firebase：</span>
                 <ol className="list-decimal list-inside text-sm font-semibold ml-2 space-y-1">
-                  <li>打开您的 Firebase 后台，点击左侧菜单栏的 <b>Build</b> {'->'} <b>Authentication</b></li>
-                  <li>点击 <b>Get Started</b>，然后选择上方的 <b>Sign-in method</b> 标签页</li>
-                  <li>找到 <b>Anonymous (匿名)</b> 选项，点击进入，将开关拨到 <b>Enable</b> 并保存</li>
+                  <li>点击左侧菜单栏 <b>Build</b> {'->'} <b>Authentication</b></li>
+                  <li>点击 <b>Get Started</b>，选择 <b>Sign-in method</b></li>
+                  <li>找到 <b>Anonymous (匿名)</b>，拨到 <b>Enable</b> 并保存</li>
                 </ol>
-                <span className="text-xs mt-2 bg-red-100 p-2 rounded-xl text-center font-bold">设置完成后，只需刷新此网页，一切将自动恢复正常！</span>
+                <span className="text-xs mt-2 bg-red-100 p-2 rounded-xl text-center font-bold">完成后刷新网页，即可自动恢复！</span>
               </div>
             )}
 
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.3</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.0</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
-                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端已连接</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
+                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端连线正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
                 </p>
               </div>
               <button 
@@ -372,7 +483,7 @@ export default function App() {
                     onClick={copyAndSave}
                     className={`w-full mt-8 py-5 rounded-[24px] font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 ${copiedStatus ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                   >
-                    {copiedStatus ? <><CheckCircle2/> 已复制并同步！</> : <><ClipboardCopy/> 复制并存档</>}
+                    {copiedStatus ? <><CheckCircle2/> 已复制！</> : <><ClipboardCopy/> 复制并存档</>}
                   </button>
                 </div>
               </div>
@@ -381,7 +492,80 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: PDF 转 JPG 工具                                    */}
+        {/* TAB 2: 数据统计 (新增功能)                                  */}
+        {/* ========================================================= */}
+        {activeTab === 'stats' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            
+            {/* 顶部过滤器 */}
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+               <div className="flex items-center gap-4 w-full sm:w-auto">
+                 <div className="bg-indigo-100 text-indigo-600 p-3 rounded-2xl"><BarChart3 size={24}/></div>
+                 <h2 className="text-xl font-black text-slate-800">个人请假分析</h2>
+               </div>
+               
+               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                 <select value={statYear} onChange={e => setStatYear(e.target.value)} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500">
+                    {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
+                 </select>
+                 <select value={statTeacher} onChange={e => setStatTeacher(e.target.value)} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500">
+                    {sortedTeachers.map(t => <option key={t} value={t}>{t}</option>)}
+                 </select>
+               </div>
+            </div>
+
+            {/* 汇总卡片 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-orange-500 shadow-sm flex flex-col justify-center">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">年度累计 CRK 天数</p>
+                  <p className="text-4xl font-black text-slate-800">{statsData.totalCRKDays} <span className="text-lg text-slate-400">天</span></p>
+               </div>
+               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-blue-500 shadow-sm flex flex-col justify-center">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">年度 CRK 申请次数</p>
+                  <p className="text-4xl font-black text-slate-800">{statsData.totalCRKTimes} <span className="text-lg text-slate-400">次</span></p>
+               </div>
+               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-green-500 shadow-sm flex flex-col justify-center">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">病假 (Cuti Sakit) 次数</p>
+                  <p className="text-4xl font-black text-slate-800">{statsData.totalSakitTimes} <span className="text-lg text-slate-400">次</span></p>
+               </div>
+            </div>
+
+            {/* 每个月明细表 */}
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden">
+               <div className="p-6 bg-slate-50 border-b border-slate-200">
+                 <h3 className="font-black text-slate-800 text-lg">📅 月度明细报表 ({statYear}年)</h3>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-400">
+                       <th className="p-4 font-black border-b">月份</th>
+                       <th className="p-4 font-black border-b text-center">CRK 天数</th>
+                       <th className="p-4 font-black border-b text-center">CRK 申请次数</th>
+                       <th className="p-4 font-black border-b text-center">病假次数</th>
+                       <th className="p-4 font-black border-b text-center">其他假 (Bengkel等)</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {statsData.monthlyData.map((row) => (
+                       <tr key={row.month} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                         <td className="p-4 font-black text-slate-700">{row.month} 月</td>
+                         <td className="p-4 text-center font-bold text-orange-600">{row.CRK_days > 0 ? `${row.CRK_days} 天` : '-'}</td>
+                         <td className="p-4 text-center font-bold text-slate-600">{row.CRK_times > 0 ? `${row.CRK_times} 次` : '-'}</td>
+                         <td className="p-4 text-center font-bold text-green-600">{row.SAKIT_times > 0 ? `${row.SAKIT_times} 次` : '-'}</td>
+                         <td className="p-4 text-center font-bold text-purple-600">{row.OTHER_times > 0 ? `${row.OTHER_times} 次` : '-'}</td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3: PDF 转 JPG 工具                                    */}
         {/* ========================================================= */}
         {activeTab === 'pdf' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -442,9 +626,33 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
+        {/* Modal: 自定义确认删除 (解决 iframe 下 alert 失效问题)       */}
+        {/* ========================================================= */}
+        {recordToDelete && (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-white rounded-[32px] p-8 w-full max-w-sm space-y-5 shadow-2xl">
+              <div className="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                 <AlertTriangle size={28} />
+              </div>
+              <h3 className="font-black text-2xl text-slate-800">确认删除？</h3>
+              <p className="text-slate-600 font-bold leading-relaxed">
+                您确定要删除 <span className="text-blue-600 px-1">{recordToDelete.teacher}</span> 的 
+                <span className="text-slate-800 px-1">{recordToDelete.type}</span> 记录吗？
+                <br/><span className="text-xs text-red-500 mt-2 block">(此操作不可恢复，统计数据也将同步扣除)</span>
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setRecordToDelete(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">取消</button>
+                <button onClick={confirmDeleteRecord} className="flex-1 py-3.5 bg-red-500 text-white rounded-2xl font-black hover:bg-red-600 shadow-md transition-all">确定删除</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
         {/* Modal: 历史与管理 (共用)                                   */}
         {/* ========================================================= */}
         
+        {/* 历史记录 Modal */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
@@ -472,8 +680,8 @@ export default function App() {
                         </div>
                       </div>
                       <button 
-                        onClick={() => deleteRecord(rec.id)}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-slate-100 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                        onClick={() => setRecordToDelete(rec)}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                       >
                         <Trash2 size={20}/>
                       </button>
@@ -485,6 +693,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 名单管理 Modal */}
         {showManager && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
