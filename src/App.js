@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 // ==========================================
 // 1. Firebase 配置
@@ -19,10 +19,9 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
-// 兼容不同运行环境的 appId
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
-// 基础名单库 (防止白屏)
+// 基础名单库 (防白屏关键：就算连不上云端，也有这些兜底)
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
@@ -30,11 +29,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'pdf'
 
   // =====================================
-  // 请假系统状态 (加入默认值，防止白屏)
+  // 请假系统状态 (关键：初始值直接给 rawTeachers)
   // =====================================
   const [user, setUser] = useState(null);
-  const [authError, setAuthError] = useState(false); // 捕捉未开启匿名的错误
+  const [authError, setAuthError] = useState(false);
   
+  // 哪怕云端连不上，初始状态也是满满的名单！
   const [teachersList, setTeachersList] = useState(rawTeachers);
   const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -65,16 +65,12 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
         setAuthError(false);
       } catch (e) { 
-        console.error("Auth Error: 你可能需要在 Firebase 后台开启 Anonymous 登录！", e); 
+        console.error("Auth Error", e); 
         setAuthError(true);
-        setIsSyncing(false);
+        setIsSyncing(false); // 停止一直转圈
       }
     };
     initAuth();
@@ -85,14 +81,20 @@ export default function App() {
 
   // 2. 监听云端数据
   useEffect(() => {
-    if (!user) return; // 如果没通过保安，就不去后台拿数据，保留默认的 rawTeachers
+    // 关键防御：如果没有通过 Firebase 保安验证，就直接退出监听，保留初始名单，这样绝不会白屏！
+    if (!user) return; 
+    
     setIsSyncing(true);
 
     const unsubTeachers = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'teachers_list'), (snap) => {
       if (snap.exists()) setTeachersList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
-    }, (err) => console.error(err));
+    }, (err) => {
+      console.error(err);
+      setAuthError(true);
+      setIsSyncing(false);
+    });
 
     const unsubLeaves = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'leave_types'), (snap) => {
       if (snap.exists()) setLeaveTypesList(snap.data().list || []);
@@ -168,10 +170,8 @@ export default function App() {
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
 
-    if (!user) {
-        alert("由于未连接云端，已复制文字但无法存档。");
-        return;
-    }
+    // 如果没有通过验证，就只复制不存历史，防止报错崩溃
+    if (!user) return;
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leave_history'), {
@@ -262,8 +262,8 @@ export default function App() {
             {/* 智能报错面板：如果没有开启 Authentication 就会显示 */}
             {authError && (
               <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
-                <span className="font-black text-lg flex items-center gap-2">🚨 云端安全锁未开启！(当前名单无法同步)</span>
-                <span className="font-bold text-sm text-red-500">因为升级了自动存档，您需要去 Firebase 开启认证功能：</span>
+                <span className="font-black text-lg flex items-center gap-2">🚨 云端安全锁未开启！(自动开启离线备用模式)</span>
+                <span className="font-bold text-sm text-red-500">不用慌，您依然可以正常使用生成器，只是现在的名单不会与其他设备同步，历史记录也无法存档。要想恢复神同步，请去 Firebase 开启认证功能：</span>
                 <ol className="list-decimal list-inside text-sm font-semibold ml-2 space-y-1">
                   <li>打开您的 Firebase 后台，点击左侧菜单栏的 <b>Build</b> {'->'} <b>Authentication</b></li>
                   <li>点击 <b>Get Started</b>，然后选择上方的 <b>Sign-in method</b> 标签页</li>
@@ -276,10 +276,10 @@ export default function App() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.1</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.2</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
-                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端已连接</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线模式</span>}
+                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端已连接</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
                 </p>
               </div>
               <button 
@@ -438,6 +438,10 @@ export default function App() {
           </div>
         )}
 
+        {/* ========================================================= */}
+        {/* Modal: 历史与管理 (共用)                                   */}
+        {/* ========================================================= */}
+        
         {/* 历史记录 Modal */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
