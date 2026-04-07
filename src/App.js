@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 
 // ==========================================
 // 1. Firebase 配置
@@ -21,20 +21,19 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
-// 基础名单库 (防白屏关键：就算连不上云端，也有这些兜底)
+// 基础名单库 (防白屏兜底)
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'pdf'
+  const [activeTab, setActiveTab] = useState('leave'); 
 
   // =====================================
-  // 请假系统状态 (关键：初始值直接给 rawTeachers)
+  // 请假系统状态
   // =====================================
   const [user, setUser] = useState(null);
   const [authError, setAuthError] = useState(false);
   
-  // 哪怕云端连不上，初始状态也是满满的名单！
   const [teachersList, setTeachersList] = useState(rawTeachers);
   const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -65,12 +64,16 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        await signInAnonymously(auth);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
         setAuthError(false);
       } catch (e) { 
         console.error("Auth Error", e); 
         setAuthError(true);
-        setIsSyncing(false); // 停止一直转圈
+        setIsSyncing(false); 
       }
     };
     initAuth();
@@ -79,14 +82,14 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
-  // 2. 监听云端数据
+  // 2. 监听云端数据 (修复了致命的段数报错)
   useEffect(() => {
-    // 关键防御：如果没有通过 Firebase 保安验证，就直接退出监听，保留初始名单，这样绝不会白屏！
     if (!user) return; 
-    
     setIsSyncing(true);
 
-    const unsubTeachers = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'teachers_list'), (snap) => {
+    // 修复点：使用 'app_config' 补齐到 6 个层级，符合 doc() 要求
+    const teachersRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'teachers_list');
+    const unsubTeachers = onSnapshot(teachersRef, (snap) => {
       if (snap.exists()) setTeachersList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
@@ -96,11 +99,13 @@ export default function App() {
       setIsSyncing(false);
     });
 
-    const unsubLeaves = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'leave_types'), (snap) => {
+    const leavesRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'leave_types');
+    const unsubLeaves = onSnapshot(leavesRef, (snap) => {
       if (snap.exists()) setLeaveTypesList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawLeaveTypes });
     }, (err) => console.error(err));
 
+    // 历史记录本来就是集合，5 个层级完全正确
     const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
     const unsubHistory = onSnapshot(qHistory, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -170,7 +175,6 @@ export default function App() {
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
 
-    // 如果没有通过验证，就只复制不存历史，防止报错崩溃
     if (!user) return;
 
     try {
@@ -190,7 +194,8 @@ export default function App() {
 
   const updateList = (col, newList) => {
     if(!user) return alert("请先解决上方的红色连接错误，才能修改云端名单！");
-    setDoc(doc(db, 'artifacts', appId, 'public', 'data', col), { list: newList });
+    // 这里也对应补齐了 6 个层级
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
   const handlePdfUpload = async (e) => {
@@ -233,7 +238,6 @@ export default function App() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -259,7 +263,6 @@ export default function App() {
         {activeTab === 'leave' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
-            {/* 智能报错面板：如果没有开启 Authentication 就会显示 */}
             {authError && (
               <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
                 <span className="font-black text-lg flex items-center gap-2">🚨 云端安全锁未开启！(自动开启离线备用模式)</span>
@@ -276,7 +279,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.2</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.3</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端已连接</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
@@ -369,7 +372,7 @@ export default function App() {
                     onClick={copyAndSave}
                     className={`w-full mt-8 py-5 rounded-[24px] font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 ${copiedStatus ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                   >
-                    {copiedStatus ? <><CheckCircle2/> 已复制文字！</> : <><ClipboardCopy/> 复制并存档</>}
+                    {copiedStatus ? <><CheckCircle2/> 已复制并同步！</> : <><ClipboardCopy/> 复制并存档</>}
                   </button>
                 </div>
               </div>
@@ -389,20 +392,20 @@ export default function App() {
               </div>
               <h2 className="text-2xl font-black text-slate-800">上传公函 (PDF)</h2>
               <p className="text-slate-500 font-medium text-sm max-w-md mx-auto">
-                完全在你的浏览器本地转换，不会上传到任何服务器，100% 保障学校机密安全。
+                完全在您的设备本地高速转换，绝不上传任何服务器，100% 保障学校机密安全。
               </p>
               
               <div className="pt-6">
                 <label className="inline-flex items-center justify-center gap-3 px-8 py-4 bg-orange-500 text-white font-black text-lg rounded-2xl cursor-pointer hover:bg-orange-600 transition-all shadow-lg active:scale-95">
                   <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} />
                   {isConverting ? <Loader2 className="animate-spin" /> : <ImageIcon />}
-                  {isConverting ? '正在努力转换中...' : '选择 PDF 文件'}
+                  {isConverting ? '正在高速转换中...' : '选择 PDF 文件'}
                 </label>
               </div>
             </div>
 
             {pdfImages.length > 0 && (
-              <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 space-y-8">
+              <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 space-y-8 animate-in zoom-in-95">
                 <div className="flex items-center justify-between border-b pb-4">
                   <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                     <CheckCircle2 className="text-green-500"/> 转换成功 ({pdfImages.length} 页)
@@ -428,7 +431,7 @@ export default function App() {
                          onClick={() => downloadImage(imgSrc, index)}
                          className="w-full py-3 bg-slate-800 text-white rounded-xl font-black flex justify-center items-center gap-2 hover:bg-slate-700 transition-all active:scale-95"
                       >
-                         <Download size={18}/> 保存到相册/电脑
+                         <Download size={18}/> 存入相册/电脑
                       </button>
                     </div>
                   ))}
@@ -442,7 +445,6 @@ export default function App() {
         {/* Modal: 历史与管理 (共用)                                   */}
         {/* ========================================================= */}
         
-        {/* 历史记录 Modal */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
@@ -483,7 +485,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 名单管理 Modal */}
         {showManager && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
