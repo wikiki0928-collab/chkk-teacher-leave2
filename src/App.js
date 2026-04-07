@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 
 // ==========================================
 // 1. Firebase 配置
@@ -19,22 +19,26 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
+// 兼容不同运行环境的 appId
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
+// 基础名单库 (防止白屏)
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
 
 export default function App() {
-  // 导航栏状态
   const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'pdf'
 
   // =====================================
-  // 请假系统状态
+  // 请假系统状态 (加入默认值，防止白屏)
   // =====================================
   const [user, setUser] = useState(null);
-  const [teachersList, setTeachersList] = useState([]);
-  const [leaveTypesList, setLeaveTypesList] = useState([]);
+  const [authError, setAuthError] = useState(false); // 捕捉未开启匿名的错误
+  
+  const [teachersList, setTeachersList] = useState(rawTeachers);
+  const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
   const [historyRecords, setHistoryRecords] = useState([]);
+  
   const [isSyncing, setIsSyncing] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showManager, setShowManager] = useState(null);
@@ -57,30 +61,42 @@ export default function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
 
-  // 初始化 Firebase & Auth
+  // 1. 初始化 安全认证
   useEffect(() => {
     const initAuth = async () => {
-      try { await signInAnonymously(auth); } catch (e) { console.error("Auth Error", e); }
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        setAuthError(false);
+      } catch (e) { 
+        console.error("Auth Error: 你可能需要在 Firebase 后台开启 Anonymous 登录！", e); 
+        setAuthError(true);
+        setIsSyncing(false);
+      }
     };
     initAuth();
+    
     const unsubAuth = onAuthStateChanged(auth, setUser);
     return () => unsubAuth();
   }, []);
 
-  // 监听云端数据
+  // 2. 监听云端数据
   useEffect(() => {
-    if (!user) return;
+    if (!user) return; // 如果没通过保安，就不去后台拿数据，保留默认的 rawTeachers
     setIsSyncing(true);
 
     const unsubTeachers = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'teachers_list'), (snap) => {
       if (snap.exists()) setTeachersList(snap.data().list || []);
-      else { setDoc(snap.ref, { list: rawTeachers }); setTeachersList(rawTeachers); }
+      else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
     }, (err) => console.error(err));
 
     const unsubLeaves = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'leave_types'), (snap) => {
       if (snap.exists()) setLeaveTypesList(snap.data().list || []);
-      else { setDoc(snap.ref, { list: rawLeaveTypes }); setLeaveTypesList(rawLeaveTypes); }
+      else setDoc(snap.ref, { list: rawLeaveTypes });
     }, (err) => console.error(err));
 
     const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
@@ -93,7 +109,7 @@ export default function App() {
     return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
   }, [user]);
 
-  // 加载 PDF.js 引擎 (纯前端转换库)
+  // 3. 加载 PDF 引擎
   useEffect(() => {
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
@@ -108,11 +124,7 @@ export default function App() {
     }
   }, []);
 
-  // =====================================
-  // 核心逻辑函数
-  // =====================================
-
-  // 请假系统计算与处理
+  // 4. 计算与逻辑处理
   const sortedTeachers = useMemo(() => [...teachersList].sort((a, b) => a.localeCompare(b)), [teachersList]);
   
   useEffect(() => {
@@ -148,7 +160,6 @@ export default function App() {
   const finalMessage = `**${selectedTeacher}**\n${leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType}\n${getDateLine()}`;
 
   const copyAndSave = async () => {
-    if (!user) return;
     const el = document.createElement('textarea');
     el.value = finalMessage;
     document.body.appendChild(el); el.select();
@@ -156,6 +167,11 @@ export default function App() {
     document.body.removeChild(el);
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
+
+    if (!user) {
+        alert("由于未连接云端，已复制文字但无法存档。");
+        return;
+    }
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leave_history'), {
@@ -173,21 +189,16 @@ export default function App() {
   };
 
   const updateList = (col, newList) => {
+    if(!user) return alert("请先解决上方的红色连接错误，才能修改云端名单！");
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', col), { list: newList });
   };
 
-  // PDF转JPG核心逻辑 (完全在浏览器内运行)
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') return;
+    if (!pdfjsLoaded) return alert('引擎准备中，请稍后再试！');
 
-    if (!pdfjsLoaded) {
-      alert('转换引擎正在准备中，请等几秒钟再试！');
-      return;
-    }
-
-    setIsConverting(true);
-    setPdfImages([]);
+    setIsConverting(true); setPdfImages([]);
 
     try {
       const reader = new FileReader();
@@ -196,17 +207,15 @@ export default function App() {
         const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
         const images = [];
 
-        // 遍历所有页面并转成高质量 JPG
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 }); // 2.0 保证了 300dpi 级的高清度
+          const viewport = page.getViewport({ scale: 2.0 }); 
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
+          canvas.height = viewport.height; canvas.width = viewport.width;
 
           await page.render({ canvasContext: context, viewport: viewport }).promise;
-          images.push(canvas.toDataURL('image/jpeg', 0.95)); // 输出高质量 JPG
+          images.push(canvas.toDataURL('image/jpeg', 0.95)); 
         }
         
         setPdfImages(images);
@@ -214,19 +223,14 @@ export default function App() {
       };
       reader.readAsArrayBuffer(file);
     } catch (error) {
-      console.error("PDF转换失败:", error);
-      setIsConverting(false);
-      alert("转换失败，可能是文件损坏或加密。");
+      console.error(error); setIsConverting(false); alert("转换失败。");
     }
   };
 
   const downloadImage = (dataUrl, index) => {
-    const link = document.createElement('a');
-    link.href = dataUrl;
+    const link = document.createElement('a'); link.href = dataUrl;
     link.download = `公函_第${index + 1}页.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
 
@@ -234,7 +238,6 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* 全局导航栏 (Toolkit Switcher) */}
         <div className="bg-slate-900 rounded-[32px] p-2 flex gap-2 shadow-xl overflow-x-auto no-scrollbar">
           <button 
             onClick={() => setActiveTab('leave')}
@@ -255,12 +258,29 @@ export default function App() {
         {/* ========================================================= */}
         {activeTab === 'leave' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            
+            {/* 智能报错面板：如果没有开启 Authentication 就会显示 */}
+            {authError && (
+              <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
+                <span className="font-black text-lg flex items-center gap-2">🚨 云端安全锁未开启！(当前名单无法同步)</span>
+                <span className="font-bold text-sm text-red-500">因为升级了自动存档，您需要去 Firebase 开启认证功能：</span>
+                <ol className="list-decimal list-inside text-sm font-semibold ml-2 space-y-1">
+                  <li>打开您的 Firebase 后台，点击左侧菜单栏的 <b>Build</b> {'->'} <b>Authentication</b></li>
+                  <li>点击 <b>Get Started</b>，然后选择上方的 <b>Sign-in method</b> 标签页</li>
+                  <li>找到 <b>Anonymous (匿名)</b> 选项，点击进入，将开关拨到 <b>Enable</b> 并保存</li>
+                </ol>
+                <span className="text-xs mt-2 bg-red-100 p-2 rounded-xl text-center font-bold">设置完成后，只需刷新此网页，一切将自动恢复正常！</span>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                    老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v2.1</span>
                 </h1>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1">自动存档版 (Telegram 加粗支持)</p>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
+                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端已连接</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线模式</span>}
+                </p>
               </div>
               <button 
                 onClick={() => setShowHistory(true)}
@@ -349,7 +369,7 @@ export default function App() {
                     onClick={copyAndSave}
                     className={`w-full mt-8 py-5 rounded-[24px] font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 ${copiedStatus ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                   >
-                    {copiedStatus ? <><CheckCircle2/> 已复制并同步历史！</> : <><ClipboardCopy/> 复制并存档</>}
+                    {copiedStatus ? <><CheckCircle2/> 已复制文字！</> : <><ClipboardCopy/> 复制并存档</>}
                   </button>
                 </div>
               </div>
@@ -381,7 +401,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 转换结果展示区 */}
             {pdfImages.length > 0 && (
               <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 space-y-8">
                 <div className="flex items-center justify-between border-b pb-4">
@@ -419,10 +438,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* Modal: 历史与管理 (共用)                                   */}
-        {/* ========================================================= */}
-        
         {/* 历史记录 Modal */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
