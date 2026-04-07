@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle } from 'lucide-react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -23,14 +23,23 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
 // 基础名单库 (防白屏兜底)
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
-const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
+const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
+
+// 纯函数：计算工作日 (扣除周六日)
+const countWorkDays = (start, end) => {
+  let count = 0; let cur = new Date(start); const stop = new Date(end);
+  while (cur <= stop) { 
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) count++; 
+    cur.setDate(cur.getDate() + 1); 
+  }
+  return count;
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('leave'); // 'leave' | 'stats' | 'pdf'
 
-  // =====================================
-  // UI 辅助状态 (取代原有的 alert 和 confirm)
-  // =====================================
+  // UI 辅助状态
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
 
@@ -39,16 +48,12 @@ export default function App() {
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  // =====================================
   // 请假系统状态
-  // =====================================
   const [user, setUser] = useState(null);
   const [authError, setAuthError] = useState(false);
-  
   const [teachersList, setTeachersList] = useState(rawTeachers);
   const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
   const [historyRecords, setHistoryRecords] = useState([]);
-  
   const [isSyncing, setIsSyncing] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showManager, setShowManager] = useState(null);
@@ -64,15 +69,11 @@ export default function App() {
   const [isSelesai, setIsSelesai] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
 
-  // =====================================
-  // 统计分析系统状态
-  // =====================================
-  const [statTeacher, setStatTeacher] = useState("");
+  // 统计系统状态 (大表盘)
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
+  const [statSearch, setStatSearch] = useState("");
 
-  // =====================================
   // PDF 工具状态
-  // =====================================
   const [pdfImages, setPdfImages] = useState([]);
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
@@ -94,7 +95,6 @@ export default function App() {
       }
     };
     initAuth();
-    
     const unsubAuth = onAuthStateChanged(auth, setUser);
     return () => unsubAuth();
   }, []);
@@ -109,23 +109,20 @@ export default function App() {
       if (snap.exists()) setTeachersList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
-    }, (err) => {
-      setAuthError(true);
-      setIsSyncing(false);
-    });
+    }, (err) => { setAuthError(true); setIsSyncing(false); });
 
     const leavesRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'leave_types');
     const unsubLeaves = onSnapshot(leavesRef, (snap) => {
       if (snap.exists()) setLeaveTypesList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawLeaveTypes });
-    }, (err) => console.error(err));
+    });
 
     const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
     const unsubHistory = onSnapshot(qHistory, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const sorted = docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setHistoryRecords(sorted);
-    }, (err) => console.error(err));
+    });
 
     return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
   }, [user]);
@@ -140,9 +137,7 @@ export default function App() {
         setPdfjsLoaded(true);
       };
       document.body.appendChild(script);
-    } else {
-      setPdfjsLoaded(true);
-    }
+    } else { setPdfjsLoaded(true); }
   }, []);
 
   // 4. 请假逻辑与处理
@@ -151,19 +146,7 @@ export default function App() {
   useEffect(() => {
     if (sortedTeachers.length > 0 && !selectedTeacher) setSelectedTeacher(sortedTeachers[0]);
     if (leaveTypesList.length > 0 && !leaveType) setLeaveType(leaveTypesList[0]);
-    // 同时也为统计表赋初值
-    if (sortedTeachers.length > 0 && !statTeacher) setStatTeacher(sortedTeachers[0]);
-  }, [sortedTeachers, leaveTypesList, selectedTeacher, leaveType, statTeacher]);
-
-  const countWorkDays = (start, end) => {
-    let count = 0; let cur = new Date(start); const stop = new Date(end);
-    while (cur <= stop) { 
-      const day = cur.getDay();
-      if (day !== 0 && day !== 6) count++; 
-      cur.setDate(cur.getDate() + 1); 
-    }
-    return count;
-  };
+  }, [sortedTeachers, leaveTypesList, selectedTeacher, leaveType]);
 
   const formatTimeTo12h = (t) => {
     let [h, m] = t.split(':'); h = parseInt(h);
@@ -175,8 +158,12 @@ export default function App() {
     const f = (d) => d.split("-").reverse().join(".");
     const datePart = startDate !== endDate ? `${f(startDate)} - ${f(endDate)}` : f(startDate);
     let res = datePart;
-    if (leaveType === "CUTI REHAT KHAS") res += ` (${countWorkDays(startDate, endDate)} HARI)`;
-    else if (useTime) res += ` (${formatTimeTo12h(startTime)} - ${isSelesai ? 'SELESAI' : formatTimeTo12h(endTime)})`;
+    // CRK 或者含有 REHAT字眼的假期都自动计算天数
+    if (leaveType.includes("CUTI REHAT") || leaveType.includes("CUTI SAKIT")) {
+      res += ` (${countWorkDays(startDate, endDate)} HARI)`;
+    } else if (useTime) {
+      res += ` (${formatTimeTo12h(startTime)} - ${isSelesai ? 'SELESAI' : formatTimeTo12h(endTime)})`;
+    }
     return res;
   };
 
@@ -204,23 +191,16 @@ export default function App() {
         createdAt: serverTimestamp()
       });
       showToast("✅ 已成功复制并存入历史记录！");
-    } catch (e) { 
-      console.error("History Save Failed", e); 
-      showToast("❌ 存档失败，请检查网络！");
-    }
+    } catch (e) { showToast("❌ 存档失败，请检查网络！"); }
   };
 
-  // 确认删除记录核心逻辑
   const confirmDeleteRecord = async () => {
     if (!recordToDelete) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', recordToDelete.id));
       showToast("✅ 记录已成功删除");
-    } catch(e) {
-      showToast("❌ 删除失败");
-    } finally {
-      setRecordToDelete(null);
-    }
+    } catch(e) { showToast("❌ 删除失败"); } 
+    finally { setRecordToDelete(null); }
   };
 
   const updateList = (col, newList) => {
@@ -228,7 +208,7 @@ export default function App() {
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
-  // 5. 统计分析核心算法
+  // 5. 全体大表盘核心算法
   const availableYears = useMemo(() => {
     const years = new Set();
     historyRecords.forEach(rec => {
@@ -239,58 +219,63 @@ export default function App() {
     return Array.from(years).sort().reverse();
   }, [historyRecords]);
 
-  const statsData = useMemo(() => {
-    let totalCRKDays = 0;
-    let totalCRKTimes = 0;
-    let totalSakitTimes = 0;
-    let totalOtherTimes = 0;
-
-    const monthlyData = Array.from({ length: 12 }, (_, i) => ({
-      month: i + 1,
-      CRK_days: 0,
-      CRK_times: 0,
-      SAKIT_times: 0,
-      OTHER_times: 0
-    }));
+  const allTeachersStats = useMemo(() => {
+    const statsMap = {};
+    
+    // 初始化全校老师数据骨架
+    sortedTeachers.forEach(t => {
+      statsMap[t] = { name: t, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
+    });
 
     historyRecords.forEach(rec => {
-      if (rec.teacher !== statTeacher) return;
-      
-      // 提取日期，匹配 DD.MM.YYYY
+      // 1. 抓取年份匹配
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
       if (!dateMatch) return; 
+      if (dateMatch[3] !== statYear) return;
 
-      const month = parseInt(dateMatch[2], 10);
-      const year = dateMatch[3];
+      const tName = rec.teacher;
+      if (!statsMap[tName]) {
+        // 万一老师已经被移出主力名单，但历史里还有他，也得加进来显示
+        statsMap[tName] = { name: tName, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
+      }
 
-      if (year !== statYear) return; // 只统计选定年份
-
-      const isCRK = rec.type === "CUTI REHAT KHAS";
-      const isSakit = rec.type === "CUTI SAKIT";
-
-      if (isCRK) {
-        // 提取 (X HARI) 里面的天数
-        let days = 1;
-        const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
-        if (daysMatch) {
-          days = parseInt(daysMatch[1], 10);
-        }
-        totalCRKDays += days;
-        totalCRKTimes += 1;
-        monthlyData[month - 1].CRK_days += days;
-        monthlyData[month - 1].CRK_times += 1;
-      } else if (isSakit) {
-        totalSakitTimes += 1;
-        monthlyData[month - 1].SAKIT_times += 1;
+      // 2. 智能抓取天数 (支持 (X HARI) 格式 或 日期相减)
+      let days = 1;
+      const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
+      if (daysMatch) {
+        days = parseInt(daysMatch[1], 10);
       } else {
-        totalOtherTimes += 1;
-        monthlyData[month - 1].OTHER_times += 1;
+        const rangeMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+        if (rangeMatch) {
+          const sDate = `${rangeMatch[3]}-${rangeMatch[2]}-${rangeMatch[1]}`;
+          const eDate = `${rangeMatch[6]}-${rangeMatch[5]}-${rangeMatch[4]}`;
+          days = countWorkDays(sDate, eDate);
+        }
+      }
+
+      // 3. 分类归总
+      const type = rec.type.toUpperCase();
+      if (type.includes("REHAT KHAS") || type === "CRK") {
+        statsMap[tName].CRK_days += days;
+      } else if (type.includes("CUTI REHAT")) {
+        statsMap[tName].CR_days += days;
+      } else if (type.includes("SAKIT")) {
+        statsMap[tName].SAKIT_days += days;
+      } else if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) {
+        statsMap[tName].TIMESLIP_times += 1;
+      } else {
+        statsMap[tName].OTHER_times += 1;
       }
     });
 
-    return { totalCRKDays, totalCRKTimes, totalSakitTimes, totalOtherTimes, monthlyData };
-  }, [historyRecords, statTeacher, statYear]);
+    return Object.values(statsMap).sort((a, b) => a.name.localeCompare(b.name));
+  }, [historyRecords, statYear, sortedTeachers]);
 
+  // 根据搜索框过滤显示的名单
+  const filteredStats = useMemo(() => {
+    if (!statSearch) return allTeachersStats;
+    return allTeachersStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
+  }, [allTeachersStats, statSearch]);
 
   // 6. PDF 转换逻辑
   const handlePdfUpload = async (e) => {
@@ -313,19 +298,13 @@ export default function App() {
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
           canvas.height = viewport.height; canvas.width = viewport.width;
-
           await page.render({ canvasContext: context, viewport: viewport }).promise;
           images.push(canvas.toDataURL('image/jpeg', 0.95)); 
         }
-        
-        setPdfImages(images);
-        setIsConverting(false);
-        showToast("✅ PDF 转换完成！");
+        setPdfImages(images); setIsConverting(false); showToast("✅ PDF 转换完成！");
       };
       reader.readAsArrayBuffer(file);
-    } catch (error) {
-      console.error(error); setIsConverting(false); showToast("❌ 转换失败，文件可能已损坏。");
-    }
+    } catch (error) { setIsConverting(false); showToast("❌ 转换失败，文件可能损坏。"); }
   };
 
   const downloadImage = (dataUrl, index) => {
@@ -337,14 +316,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900 relative">
       
-      {/* 全局浮动 Toast 提示 */}
+      {/* 浮动 Toast 提示 */}
       {toastMsg && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm animate-in slide-in-from-top-4 fade-in">
           {toastMsg}
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         
         {/* 全局导航栏 */}
         <div className="bg-slate-900 rounded-[32px] p-2 flex gap-2 shadow-xl overflow-x-auto no-scrollbar">
@@ -358,13 +337,13 @@ export default function App() {
             onClick={() => setActiveTab('stats')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
           >
-            <BarChart3 size={18}/> 数据统计
+            <BarChart3 size={18}/> 全校数据统计
           </button>
           <button 
             onClick={() => setActiveTab('pdf')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
           >
-            <FileImage size={18}/> PDF工具
+            <FileImage size={18}/> PDF转JPG
           </button>
         </div>
 
@@ -376,21 +355,15 @@ export default function App() {
             
             {authError && (
               <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
-                <span className="font-black text-lg flex items-center gap-2"><AlertTriangle/> 🚨 云端安全锁未开启！(离线模式)</span>
-                <span className="font-bold text-sm text-red-500">不用慌，您可正常使用生成器，但名单和历史无法同步。要恢复神同步，请去 Firebase：</span>
-                <ol className="list-decimal list-inside text-sm font-semibold ml-2 space-y-1">
-                  <li>点击左侧菜单栏 <b>Build</b> {'->'} <b>Authentication</b></li>
-                  <li>点击 <b>Get Started</b>，选择 <b>Sign-in method</b></li>
-                  <li>找到 <b>Anonymous (匿名)</b>，拨到 <b>Enable</b> 并保存</li>
-                </ol>
-                <span className="text-xs mt-2 bg-red-100 p-2 rounded-xl text-center font-bold">完成后刷新网页，即可自动恢复！</span>
+                <span className="font-black text-lg flex items-center gap-2"><AlertTriangle/> 🚨 云端连接错误 (离线保护模式已启动)</span>
+                <span className="font-bold text-sm text-red-500">不用慌，您可正常使用生成器，但数据无法与其他设备同步。请联系管理员开启 Firebase Authentication 匿名登录功能。</span>
               </div>
             )}
 
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.0</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.1</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端连线正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
@@ -400,7 +373,7 @@ export default function App() {
                 onClick={() => setShowHistory(true)}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95"
               >
-                <History size={18}/> 历史记录 ({historyRecords.length})
+                <History size={18}/> 历史存档记录
               </button>
             </div>
 
@@ -450,7 +423,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {leaveType !== "CUTI REHAT KHAS" && (
+                  {leaveType !== "CUTI REHAT KHAS" && !leaveType.includes("CUTI REHAT") && (
                     <div className="space-y-3 pt-2">
                       <label className="flex items-center justify-between p-4 bg-blue-50/50 border border-blue-100 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all">
                         <span className="text-sm font-black text-blue-700 flex items-center gap-2"><Clock size={18}/> 具体时间 (Optional)</span>
@@ -492,73 +465,86 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: 数据统计 (新增功能)                                  */}
+        {/* TAB 2: 全校数据统计 (大表盘版)                             */}
         {/* ========================================================= */}
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
-            {/* 顶部过滤器 */}
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
-               <div className="flex items-center gap-4 w-full sm:w-auto">
-                 <div className="bg-indigo-100 text-indigo-600 p-3 rounded-2xl"><BarChart3 size={24}/></div>
-                 <h2 className="text-xl font-black text-slate-800">个人请假分析</h2>
-               </div>
-               
-               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                 <select value={statYear} onChange={e => setStatYear(e.target.value)} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500">
-                    {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
-                 </select>
-                 <select value={statTeacher} onChange={e => setStatTeacher(e.target.value)} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-2 focus:ring-indigo-500">
-                    {sortedTeachers.map(t => <option key={t} value={t}>{t}</option>)}
-                 </select>
-               </div>
-            </div>
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              
+              {/* 大表盘顶部工具栏 */}
+              <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                 <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
+                   <BarChart3 className="text-indigo-600" size={26}/> 
+                   {statYear}年度 全校老师请假总览
+                 </h3>
+                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                       <input 
+                         type="text" 
+                         placeholder="搜寻老师名字..." 
+                         value={statSearch} 
+                         onChange={e => setStatSearch(e.target.value)} 
+                         className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all" 
+                       />
+                    </div>
+                    <select 
+                      value={statYear} 
+                      onChange={e => setStatYear(e.target.value)} 
+                      className="px-6 py-3 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all cursor-pointer text-center"
+                    >
+                       {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
+                    </select>
+                 </div>
+              </div>
 
-            {/* 汇总卡片 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-orange-500 shadow-sm flex flex-col justify-center">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">年度累计 CRK 天数</p>
-                  <p className="text-4xl font-black text-slate-800">{statsData.totalCRKDays} <span className="text-lg text-slate-400">天</span></p>
-               </div>
-               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-blue-500 shadow-sm flex flex-col justify-center">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">年度 CRK 申请次数</p>
-                  <p className="text-4xl font-black text-slate-800">{statsData.totalCRKTimes} <span className="text-lg text-slate-400">次</span></p>
-               </div>
-               <div className="bg-white rounded-3xl p-6 border-b-4 border-b-green-500 shadow-sm flex flex-col justify-center">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">病假 (Cuti Sakit) 次数</p>
-                  <p className="text-4xl font-black text-slate-800">{statsData.totalSakitTimes} <span className="text-lg text-slate-400">次</span></p>
-               </div>
-            </div>
-
-            {/* 每个月明细表 */}
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden">
-               <div className="p-6 bg-slate-50 border-b border-slate-200">
-                 <h3 className="font-black text-slate-800 text-lg">📅 月度明细报表 ({statYear}年)</h3>
-               </div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-left border-collapse">
-                   <thead>
-                     <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-400">
-                       <th className="p-4 font-black border-b">月份</th>
-                       <th className="p-4 font-black border-b text-center">CRK 天数</th>
-                       <th className="p-4 font-black border-b text-center">CRK 申请次数</th>
-                       <th className="p-4 font-black border-b text-center">病假次数</th>
-                       <th className="p-4 font-black border-b text-center">其他假 (Bengkel等)</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {statsData.monthlyData.map((row) => (
-                       <tr key={row.month} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                         <td className="p-4 font-black text-slate-700">{row.month} 月</td>
-                         <td className="p-4 text-center font-bold text-orange-600">{row.CRK_days > 0 ? `${row.CRK_days} 天` : '-'}</td>
-                         <td className="p-4 text-center font-bold text-slate-600">{row.CRK_times > 0 ? `${row.CRK_times} 次` : '-'}</td>
-                         <td className="p-4 text-center font-bold text-green-600">{row.SAKIT_times > 0 ? `${row.SAKIT_times} 次` : '-'}</td>
-                         <td className="p-4 text-center font-bold text-purple-600">{row.OTHER_times > 0 ? `${row.OTHER_times} 次` : '-'}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
+              {/* 大表盘表格主体 */}
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto relative bg-white">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm">
+                    <tr className="text-[11px] uppercase tracking-widest text-slate-500">
+                      <th className="p-4 font-black border-b whitespace-nowrap min-w-[200px]">教师姓名</th>
+                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-blue-600">Cuti Rehat (天)</th>
+                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-orange-600">CRK (天)</th>
+                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-green-600">病假 C.Sakit (天)</th>
+                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-slate-600">Time-Slip (次)</th>
+                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-purple-600">其他 (次)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStats.map((row, i) => (
+                      <tr key={row.name} className={`border-b border-slate-100 transition-colors hover:bg-indigo-50/50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <td className="p-4 font-black text-slate-800 whitespace-nowrap">{row.name}</td>
+                        <td className="p-4 text-center font-bold text-blue-600">
+                          {row.CR_days > 0 ? <span className="bg-blue-100 px-2 py-1 rounded-md">{row.CR_days} 天</span> : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="p-4 text-center font-bold text-orange-600">
+                          {row.CRK_days > 0 ? <span className="bg-orange-100 px-2 py-1 rounded-md">{row.CRK_days} 天</span> : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="p-4 text-center font-bold text-green-600">
+                          {row.SAKIT_days > 0 ? <span className="bg-green-100 px-2 py-1 rounded-md">{row.SAKIT_days} 天</span> : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="p-4 text-center font-bold text-slate-600">
+                          {row.TIMESLIP_times > 0 ? <span className="bg-slate-200 px-2 py-1 rounded-md">{row.TIMESLIP_times} 次</span> : <span className="text-slate-300">-</span>}
+                        </td>
+                        <td className="p-4 text-center font-bold text-purple-600">
+                          {row.OTHER_times > 0 ? <span className="bg-purple-100 px-2 py-1 rounded-md">{row.OTHER_times} 次</span> : <span className="text-slate-300">-</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredStats.length === 0 && (
+                  <div className="text-center p-16 flex flex-col items-center justify-center opacity-50">
+                    <Search size={48} className="mb-4 text-slate-400"/>
+                    <p className="text-slate-500 font-black text-lg">没有找到匹配的老师</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs font-bold text-slate-400">
+                 💡 提示：天数自动根据历史记录里的 (X HARI) 或日期区间计算。若要修改数据，请去“历史存档记录”中删除错漏的记录。
+              </div>
             </div>
 
           </div>
@@ -569,7 +555,6 @@ export default function App() {
         {/* ========================================================= */}
         {activeTab === 'pdf' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            
             <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 text-center space-y-4">
               <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2">
                 <FileUp size={32} />
@@ -626,7 +611,7 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
-        {/* Modal: 自定义确认删除 (解决 iframe 下 alert 失效问题)       */}
+        {/* Modal: 自定义确认删除                                      */}
         {/* ========================================================= */}
         {recordToDelete && (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in">
@@ -638,7 +623,7 @@ export default function App() {
               <p className="text-slate-600 font-bold leading-relaxed">
                 您确定要删除 <span className="text-blue-600 px-1">{recordToDelete.teacher}</span> 的 
                 <span className="text-slate-800 px-1">{recordToDelete.type}</span> 记录吗？
-                <br/><span className="text-xs text-red-500 mt-2 block">(此操作不可恢复，统计数据也将同步扣除)</span>
+                <br/><span className="text-xs text-red-500 mt-2 block">(删除后，该老师在表盘上的总天数也会随之减少)</span>
               </p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setRecordToDelete(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">取消</button>
@@ -651,15 +636,13 @@ export default function App() {
         {/* ========================================================= */}
         {/* Modal: 历史与管理 (共用)                                   */}
         {/* ========================================================= */}
-        
-        {/* 历史记录 Modal */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
               <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="font-black text-2xl flex items-center gap-3 text-slate-800"><History className="text-blue-600" size={28}/> 历史存档</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">云端数据实时同步中</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">从这里删除记录，将同步调整统计数据</p>
                 </div>
                 <button onClick={() => setShowHistory(false)} className="p-3 bg-slate-200 rounded-full hover:bg-red-100 hover:text-red-600 transition-all"><X size={24}/></button>
               </div>
@@ -693,7 +676,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 名单管理 Modal */}
         {showManager && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
