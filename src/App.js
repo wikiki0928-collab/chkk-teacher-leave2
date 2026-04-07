@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive } from 'lucide-react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive, MousePointerClick } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -71,6 +71,9 @@ export default function App() {
   // 统计系统状态
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
   const [statSearch, setStatSearch] = useState("");
+  
+  // 明细钻取弹窗状态 (新增)
+  const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '' });
 
   // PDF 工具状态
   const [pdfImages, setPdfImages] = useState([]);
@@ -128,7 +131,6 @@ export default function App() {
 
   // 3. 动态加载外部引擎 (PDF.js 和 JSZip)
   useEffect(() => {
-    // 加载 PDF 引擎
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -139,7 +141,6 @@ export default function App() {
       document.body.appendChild(script);
     } else { setPdfjsLoaded(true); }
 
-    // 加载 ZIP 引擎
     if (!window.JSZip) {
       const scriptZip = document.createElement('script');
       scriptZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
@@ -205,6 +206,10 @@ export default function App() {
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', recordToDelete.id));
       showToast("✅ 记录已成功删除");
+      // 如果明细窗口中所有该类的记录都被删光了，自动关闭明细窗口
+      if (detailView.isOpen && detailRecords.length <= 1) {
+        setDetailView({ ...detailView, isOpen: false });
+      }
     } catch(e) { showToast("❌ 删除失败"); } 
     finally { setRecordToDelete(null); }
   };
@@ -214,7 +219,7 @@ export default function App() {
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
-  // 5. 全体大表盘核心算法
+  // 5. 全体大表盘 & 明细钻取核心算法
   const availableYears = useMemo(() => {
     const years = new Set();
     historyRecords.forEach(rec => {
@@ -224,6 +229,16 @@ export default function App() {
     years.add(new Date().getFullYear().toString());
     return Array.from(years).sort().reverse();
   }, [historyRecords]);
+
+  // 辅助函数：统一给记录分类 (CRK, CR, SAKIT, TIMESLIP, OTHER)
+  const getRecordCategory = (typeString) => {
+    const type = typeString.toUpperCase();
+    if (type.includes("REHAT KHAS") || type === "CRK") return 'CRK';
+    if (type.includes("CUTI REHAT")) return 'CR';
+    if (type.includes("SAKIT")) return 'SAKIT';
+    if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) return 'TIMESLIP';
+    return 'OTHER';
+  };
 
   const allTeachersStats = useMemo(() => {
     const statsMap = {};
@@ -252,11 +267,11 @@ export default function App() {
         }
       }
 
-      const type = rec.type.toUpperCase();
-      if (type.includes("REHAT KHAS") || type === "CRK") statsMap[tName].CRK_days += days;
-      else if (type.includes("CUTI REHAT")) statsMap[tName].CR_days += days;
-      else if (type.includes("SAKIT")) statsMap[tName].SAKIT_days += days;
-      else if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) statsMap[tName].TIMESLIP_times += 1;
+      const category = getRecordCategory(rec.type);
+      if (category === 'CRK') statsMap[tName].CRK_days += days;
+      else if (category === 'CR') statsMap[tName].CR_days += days;
+      else if (category === 'SAKIT') statsMap[tName].SAKIT_days += days;
+      else if (category === 'TIMESLIP') statsMap[tName].TIMESLIP_times += 1;
       else statsMap[tName].OTHER_times += 1;
     });
 
@@ -267,6 +282,26 @@ export default function App() {
     if (!statSearch) return allTeachersStats;
     return allTeachersStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
   }, [allTeachersStats, statSearch]);
+
+  // 获取特定明细的记录（随 historyRecords 实时响应）
+  const detailRecords = useMemo(() => {
+    if (!detailView.isOpen) return [];
+    return historyRecords.filter(rec => {
+      if (rec.teacher !== detailView.teacher) return false;
+      const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if (!dateMatch || dateMatch[3] !== statYear) return false;
+      return getRecordCategory(rec.type) === detailView.category;
+    });
+  }, [historyRecords, detailView, statYear]);
+
+  // 类别中文名称映射
+  const categoryNames = {
+    CRK: "Cuti Rehat Khas (CRK)",
+    CR: "Cuti Rehat (CR)",
+    SAKIT: "病假 (Cuti Sakit)",
+    TIMESLIP: "Time-Slip",
+    OTHER: "其他请假"
+  };
 
   // 6. PDF 转换与打包逻辑
   const handlePdfUpload = async (e) => {
@@ -304,42 +339,26 @@ export default function App() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 核心：一键打包 ZIP 功能
   const downloadAllAsZip = async () => {
-    if (!window.JSZip) {
-      return showToast("⏳ 压缩引擎加载中，请稍等...");
-    }
-    
+    if (!window.JSZip) return showToast("⏳ 压缩引擎加载中，请稍等...");
     setIsZipping(true);
     try {
       const zip = new window.JSZip();
-      
-      // 把所有 base64 图片塞进压缩包
       pdfImages.forEach((dataUrl, index) => {
         const base64Data = dataUrl.split(',')[1];
         zip.file(`公函_第${index + 1}页.jpg`, base64Data, { base64: true });
       });
-
-      // 生成 ZIP 文件并下载
       const content = await zip.generateAsync({ type: "blob" });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      
-      // 生成带有时间戳的文件名防止重复
       const dateStr = new Date().toISOString().split('T')[0];
       link.download = `公函图片包_${dateStr}.zip`;
-      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
       showToast("✅ 全部页面已成功打包下载！");
-    } catch (error) {
-      console.error(error);
-      showToast("❌ 打包失败");
-    } finally {
-      setIsZipping(false);
-    }
+    } catch (error) { showToast("❌ 打包失败"); } 
+    finally { setIsZipping(false); }
   };
 
   return (
@@ -392,7 +411,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.2</span>
+                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.3</span>
                 </h1>
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端连线正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
@@ -494,14 +513,13 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: 全校数据统计 (大表盘版)                             */}
+        {/* TAB 2: 全校数据统计 (穿透钻取版)                           */}
         {/* ========================================================= */}
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
             <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden flex flex-col">
               
-              {/* 大表盘顶部工具栏 */}
               <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                  <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
                    <BarChart3 className="text-indigo-600" size={26}/> 
@@ -528,7 +546,6 @@ export default function App() {
                  </div>
               </div>
 
-              {/* 大表盘表格主体 */}
               <div className="overflow-x-auto max-h-[600px] overflow-y-auto relative bg-white">
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm">
@@ -545,21 +562,47 @@ export default function App() {
                     {filteredStats.map((row, i) => (
                       <tr key={row.name} className={`border-b border-slate-100 transition-colors hover:bg-indigo-50/50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                         <td className="p-4 font-black text-slate-800 whitespace-nowrap">{row.name}</td>
+                        
                         <td className="p-4 text-center font-bold text-blue-600">
-                          {row.CR_days > 0 ? <span className="bg-blue-100 px-2 py-1 rounded-md">{row.CR_days} 天</span> : <span className="text-slate-300">-</span>}
+                          {row.CR_days > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CR' })} className="bg-blue-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-blue-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
+                              {row.CR_days} 天 <MousePointerClick size={12}/>
+                            </button>
+                          ) : <span className="text-slate-300">-</span>}
                         </td>
+                        
                         <td className="p-4 text-center font-bold text-orange-600">
-                          {row.CRK_days > 0 ? <span className="bg-orange-100 px-2 py-1 rounded-md">{row.CRK_days} 天</span> : <span className="text-slate-300">-</span>}
+                          {row.CRK_days > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK' })} className="bg-orange-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-orange-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
+                              {row.CRK_days} 天 <MousePointerClick size={12}/>
+                            </button>
+                          ) : <span className="text-slate-300">-</span>}
                         </td>
+                        
                         <td className="p-4 text-center font-bold text-green-600">
-                          {row.SAKIT_days > 0 ? <span className="bg-green-100 px-2 py-1 rounded-md">{row.SAKIT_days} 天</span> : <span className="text-slate-300">-</span>}
+                          {row.SAKIT_days > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'SAKIT' })} className="bg-green-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-green-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
+                              {row.SAKIT_days} 天 <MousePointerClick size={12}/>
+                            </button>
+                          ) : <span className="text-slate-300">-</span>}
                         </td>
+                        
                         <td className="p-4 text-center font-bold text-slate-600">
-                          {row.TIMESLIP_times > 0 ? <span className="bg-slate-200 px-2 py-1 rounded-md">{row.TIMESLIP_times} 次</span> : <span className="text-slate-300">-</span>}
+                          {row.TIMESLIP_times > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'TIMESLIP' })} className="bg-slate-200 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-slate-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
+                              {row.TIMESLIP_times} 次 <MousePointerClick size={12}/>
+                            </button>
+                          ) : <span className="text-slate-300">-</span>}
                         </td>
+                        
                         <td className="p-4 text-center font-bold text-purple-600">
-                          {row.OTHER_times > 0 ? <span className="bg-purple-100 px-2 py-1 rounded-md">{row.OTHER_times} 次</span> : <span className="text-slate-300">-</span>}
+                          {row.OTHER_times > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'OTHER' })} className="bg-purple-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-purple-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
+                              {row.OTHER_times} 次 <MousePointerClick size={12}/>
+                            </button>
+                          ) : <span className="text-slate-300">-</span>}
                         </td>
+
                       </tr>
                     ))}
                   </tbody>
@@ -572,7 +615,7 @@ export default function App() {
                 )}
               </div>
               <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs font-bold text-slate-400">
-                 💡 提示：天数自动根据历史记录里的 (X HARI) 或日期区间计算。若要修改数据，请去“历史存档记录”中删除错漏的记录。
+                 💡 提示：点击表单中高亮的数字徽章，即可查阅该假期所有历史记录的详细日期。
               </div>
             </div>
 
@@ -652,6 +695,52 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
+        {/* Modal: 穿透数据明细窗口 (Data Drill-down)                  */}
+        {/* ========================================================= */}
+        {detailView.isOpen && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[55] p-4 animate-in fade-in">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+              <div className="p-8 border-b flex justify-between items-center bg-indigo-50">
+                <div>
+                  <h3 className="font-black text-2xl flex items-center gap-2 text-indigo-900">
+                    <User className="text-indigo-500" size={24}/> {detailView.teacher}
+                  </h3>
+                  <p className="text-sm font-bold text-indigo-500 tracking-wider mt-1">
+                    {statYear}年 {categoryNames[detailView.category]} 明细清单
+                  </p>
+                </div>
+                <button onClick={() => setDetailView({ isOpen: false, teacher: '', category: '' })} className="p-3 bg-white rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition-all shadow-sm"><X size={24}/></button>
+              </div>
+              <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-slate-50">
+                {detailRecords.map((rec) => (
+                  <div key={rec.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group relative flex items-center justify-between">
+                    <div className="space-y-1 pr-10">
+                      <div className="text-slate-800 font-black text-lg">{rec.type}</div>
+                      <div className="text-indigo-600 font-black flex items-center gap-2">
+                        <CalendarDays size={16}/> {rec.dateInfo}
+                      </div>
+                      <div className="text-[10px] font-black text-slate-300 mt-2">
+                         记录创建时间: {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleString() : '...'}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setRecordToDelete(rec)}
+                      className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all flex-shrink-0"
+                      title="删除此记录"
+                    >
+                      <Trash2 size={20}/>
+                    </button>
+                  </div>
+                ))}
+                {detailRecords.length === 0 && (
+                  <div className="py-10 text-center text-slate-300 font-black">记录已被清空</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
         {/* Modal: 自定义确认删除                                      */}
         {/* ========================================================= */}
         {recordToDelete && (
@@ -664,7 +753,7 @@ export default function App() {
               <p className="text-slate-600 font-bold leading-relaxed">
                 您确定要删除 <span className="text-blue-600 px-1">{recordToDelete.teacher}</span> 的 
                 <span className="text-slate-800 px-1">{recordToDelete.type}</span> 记录吗？
-                <br/><span className="text-xs text-red-500 mt-2 block">(删除后，该老师在表盘上的总天数也会随之减少)</span>
+                <br/><span className="text-xs text-red-500 mt-2 block">(删除后，表盘上的总计数值也会瞬间随之减少)</span>
               </p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setRecordToDelete(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">取消</button>
