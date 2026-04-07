@@ -23,7 +23,9 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
 // 基础名单库
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
-const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "BENGKEL", "TAKLIMAT"];
+// 新增了 CUTI BERSALIN 和 CUTI KECEMASAN 以配合报表
+const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "CUTI BERSALIN", "CUTI KECEMASAN", "BENGKEL", "TAKLIMAT"];
+const bulanMelayu = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
 
 const countWorkDays = (start, end) => {
   let count = 0; let cur = new Date(start); const stop = new Date(end);
@@ -38,7 +40,6 @@ const countWorkDays = (start, end) => {
 export default function App() {
   const [activeTab, setActiveTab] = useState('leave'); 
 
-  // UI 辅助状态
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
 
@@ -47,7 +48,6 @@ export default function App() {
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  // 请假系统状态
   const [user, setUser] = useState(null);
   const [authError, setAuthError] = useState(false);
   const [teachersList, setTeachersList] = useState(rawTeachers);
@@ -68,20 +68,19 @@ export default function App() {
   const [isSelesai, setIsSelesai] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
 
-  // 统计系统状态
+  // 统计系统状态 (精确到月份)
+  const currentJsMonth = new Date().getMonth(); // 0-11
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
+  const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString()); // 1-12
   const [statSearch, setStatSearch] = useState("");
-  
-  // 明细钻取弹窗状态 (新增)
-  const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '' });
+  const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '', monthFilter: '' });
 
-  // PDF 工具状态
   const [pdfImages, setPdfImages] = useState([]);
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
-  // 1. 初始化 安全认证
+  // 初始化认证
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -91,17 +90,14 @@ export default function App() {
           await signInAnonymously(auth);
         }
         setAuthError(false);
-      } catch (e) { 
-        setAuthError(true);
-        setIsSyncing(false); 
-      }
+      } catch (e) { setAuthError(true); setIsSyncing(false); }
     };
     initAuth();
     const unsubAuth = onAuthStateChanged(auth, setUser);
     return () => unsubAuth();
   }, []);
 
-  // 2. 监听云端数据
+  // 监听云端
   useEffect(() => {
     if (!user) return; 
     setIsSyncing(true);
@@ -111,7 +107,7 @@ export default function App() {
       if (snap.exists()) setTeachersList(snap.data().list || []);
       else setDoc(snap.ref, { list: rawTeachers });
       setIsSyncing(false);
-    }, (err) => { setAuthError(true); setIsSyncing(false); });
+    }, () => { setAuthError(true); setIsSyncing(false); });
 
     const leavesRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'leave_types');
     const unsubLeaves = onSnapshot(leavesRef, (snap) => {
@@ -129,7 +125,7 @@ export default function App() {
     return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
   }, [user]);
 
-  // 3. 动态加载外部引擎 (PDF.js 和 JSZip)
+  // 加载引擎
   useEffect(() => {
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
@@ -148,7 +144,6 @@ export default function App() {
     }
   }, []);
 
-  // 4. 请假逻辑与处理
   const sortedTeachers = useMemo(() => [...teachersList].sort((a, b) => a.localeCompare(b)), [teachersList]);
   
   useEffect(() => {
@@ -166,7 +161,7 @@ export default function App() {
     const f = (d) => d.split("-").reverse().join(".");
     const datePart = startDate !== endDate ? `${f(startDate)} - ${f(endDate)}` : f(startDate);
     let res = datePart;
-    if (leaveType.includes("CUTI REHAT") || leaveType.includes("CUTI SAKIT")) {
+    if (leaveType.includes("CUTI REHAT") || leaveType.includes("CUTI SAKIT") || leaveType.includes("BERSALIN") || leaveType.includes("KECEMASAN")) {
       res += ` (${countWorkDays(startDate, endDate)} HARI)`;
     } else if (useTime) {
       res += ` (${formatTimeTo12h(startTime)} - ${isSelesai ? 'SELESAI' : formatTimeTo12h(endTime)})`;
@@ -185,11 +180,7 @@ export default function App() {
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
 
-    if (!user) {
-      showToast("离线模式：文字已复制，但未能存档到云端！");
-      return;
-    }
-
+    if (!user) { showToast("离线模式：未能存档到云端！"); return; }
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leave_history'), {
         teacher: selectedTeacher,
@@ -197,7 +188,7 @@ export default function App() {
         dateInfo: getDateLine(),
         createdAt: serverTimestamp()
       });
-      showToast("✅ 已成功复制并存入历史记录！");
+      showToast("✅ 已存入历史记录！");
     } catch (e) { showToast("❌ 存档失败，请检查网络！"); }
   };
 
@@ -206,7 +197,6 @@ export default function App() {
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', recordToDelete.id));
       showToast("✅ 记录已成功删除");
-      // 如果明细窗口中所有该类的记录都被删光了，自动关闭明细窗口
       if (detailView.isOpen && detailRecords.length <= 1) {
         setDetailView({ ...detailView, isOpen: false });
       }
@@ -215,44 +205,60 @@ export default function App() {
   };
 
   const updateList = (col, newList) => {
-    if(!user) return showToast("❌ 请先解决连接错误，才能修改云端名单！");
+    if(!user) return showToast("❌ 请先连接云端！");
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
-  // 5. 全体大表盘 & 明细钻取核心算法
+  // =====================================
+  // SJKC 官方报表统计算法
+  // =====================================
   const availableYears = useMemo(() => {
-    const years = new Set();
+    const years = new Set([new Date().getFullYear().toString()]);
     historyRecords.forEach(rec => {
       const match = rec.dateInfo.match(/\d{4}/);
       if (match) years.add(match[0]);
     });
-    years.add(new Date().getFullYear().toString());
     return Array.from(years).sort().reverse();
   }, [historyRecords]);
 
-  // 辅助函数：统一给记录分类 (CRK, CR, SAKIT, TIMESLIP, OTHER)
+  // 假期分类逻辑
   const getRecordCategory = (typeString) => {
     const type = typeString.toUpperCase();
-    if (type.includes("REHAT KHAS") || type === "CRK") return 'CRK';
-    if (type.includes("CUTI REHAT")) return 'CR';
+    if (type.includes("BERSALIN")) return 'BERSALIN';
     if (type.includes("SAKIT")) return 'SAKIT';
     if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) return 'TIMESLIP';
+    // SJKC 经典合并：CRK, CR, KECEMASAN, CTR 算在一起
+    if (type.includes("REHAT KHAS") || type === "CRK" || type.includes("CUTI REHAT") || type.includes("KECEMASAN") || type.includes("CTR")) return 'CRK_CR';
     return 'OTHER';
   };
 
-  const allTeachersStats = useMemo(() => {
+  const sjkcStats = useMemo(() => {
     const statsMap = {};
     sortedTeachers.forEach(t => {
-      statsMap[t] = { name: t, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
+      statsMap[t] = { 
+        name: t, 
+        prev_crk_cr: 0, 
+        cur_crk_cr: 0, 
+        cur_sakit: 0, 
+        cur_timeslip: 0, 
+        cur_bersalin: 0 
+      };
     });
 
     historyRecords.forEach(rec => {
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
       if (!dateMatch) return; 
-      if (dateMatch[3] !== statYear) return;
+      
+      const recYear = dateMatch[3];
+      if (recYear !== statYear) return; 
+
+      const recMonth = parseInt(dateMatch[2], 10);
+      const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) statsMap[tName] = { name: tName, CR_days: 0, CRK_days: 0, SAKIT_days: 0, TIMESLIP_times: 0, OTHER_times: 0 };
+      if (!statsMap[tName]) {
+        statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
+      }
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
@@ -268,56 +274,58 @@ export default function App() {
       }
 
       const category = getRecordCategory(rec.type);
-      if (category === 'CRK') statsMap[tName].CRK_days += days;
-      else if (category === 'CR') statsMap[tName].CR_days += days;
-      else if (category === 'SAKIT') statsMap[tName].SAKIT_days += days;
-      else if (category === 'TIMESLIP') statsMap[tName].TIMESLIP_times += 1;
-      else statsMap[tName].OTHER_times += 1;
+
+      // 计算之前的累积假期 (Jan 到 上个月)
+      if (recMonth < selMonth && category === 'CRK_CR') {
+        statsMap[tName].prev_crk_cr += days;
+      } 
+      // 计算本月假期
+      else if (recMonth === selMonth) {
+        if (category === 'CRK_CR') statsMap[tName].cur_crk_cr += days;
+        else if (category === 'SAKIT') statsMap[tName].cur_sakit += days;
+        else if (category === 'TIMESLIP') statsMap[tName].cur_timeslip += 1;
+        else if (category === 'BERSALIN') statsMap[tName].cur_bersalin += days;
+      }
     });
 
     return Object.values(statsMap).sort((a, b) => a.name.localeCompare(b.name));
-  }, [historyRecords, statYear, sortedTeachers]);
+  }, [historyRecords, statYear, statMonth, sortedTeachers]);
 
-  const filteredStats = useMemo(() => {
-    if (!statSearch) return allTeachersStats;
-    return allTeachersStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
-  }, [allTeachersStats, statSearch]);
+  const filteredSjkcStats = useMemo(() => {
+    if (!statSearch) return sjkcStats;
+    return sjkcStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
+  }, [sjkcStats, statSearch]);
 
-  // 获取特定明细的记录（随 historyRecords 实时响应）
+  // 钻取明细记录过滤
   const detailRecords = useMemo(() => {
     if (!detailView.isOpen) return [];
     return historyRecords.filter(rec => {
       if (rec.teacher !== detailView.teacher) return false;
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
       if (!dateMatch || dateMatch[3] !== statYear) return false;
+      
+      const recMonth = parseInt(dateMatch[2], 10);
+      const selMonth = parseInt(statMonth, 10);
+      
+      if (detailView.monthFilter === 'prev' && recMonth >= selMonth) return false;
+      if (detailView.monthFilter === 'cur' && recMonth !== selMonth) return false;
+      if (detailView.monthFilter === 'total' && recMonth > selMonth) return false;
+
       return getRecordCategory(rec.type) === detailView.category;
     });
-  }, [historyRecords, detailView, statYear]);
+  }, [historyRecords, detailView, statYear, statMonth]);
 
-  // 类别中文名称映射
-  const categoryNames = {
-    CRK: "Cuti Rehat Khas (CRK)",
-    CR: "Cuti Rehat (CR)",
-    SAKIT: "病假 (Cuti Sakit)",
-    TIMESLIP: "Time-Slip",
-    OTHER: "其他请假"
-  };
-
-  // 6. PDF 转换与打包逻辑
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || file.type !== 'application/pdf') return;
-    if (!pdfjsLoaded) return showToast('⏳ PDF 引擎准备中，请稍后几秒再试！');
-
+    if (!pdfjsLoaded) return showToast('⏳ 引擎准备中...');
     setIsConverting(true); setPdfImages([]);
-
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const typedarray = new Uint8Array(event.target.result);
         const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
         const images = [];
-
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const viewport = page.getViewport({ scale: 2.0 }); 
@@ -330,7 +338,7 @@ export default function App() {
         setPdfImages(images); setIsConverting(false); showToast(`✅ 成功转换 ${pdf.numPages} 页！`);
       };
       reader.readAsArrayBuffer(file);
-    } catch (error) { setIsConverting(false); showToast("❌ 转换失败，文件可能损坏。"); }
+    } catch (error) { setIsConverting(false); showToast("❌ 转换失败。"); }
   };
 
   const downloadImage = (dataUrl, index) => {
@@ -340,7 +348,7 @@ export default function App() {
   };
 
   const downloadAllAsZip = async () => {
-    if (!window.JSZip) return showToast("⏳ 压缩引擎加载中，请稍等...");
+    if (!window.JSZip) return showToast("⏳ 加载中...");
     setIsZipping(true);
     try {
       const zip = new window.JSZip();
@@ -351,115 +359,78 @@ export default function App() {
       const content = await zip.generateAsync({ type: "blob" });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      const dateStr = new Date().toISOString().split('T')[0];
-      link.download = `公函图片包_${dateStr}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast("✅ 全部页面已成功打包下载！");
+      link.download = `公函包_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      showToast("✅ 全部打包下载完成！");
     } catch (error) { showToast("❌ 打包失败"); } 
     finally { setIsZipping(false); }
   };
 
+  const bulanString = bulanMelayu[parseInt(statMonth) - 1];
+
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900 relative">
       
-      {/* 浮动 Toast 提示 */}
       {toastMsg && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm animate-in slide-in-from-top-4 fade-in">
           {toastMsg}
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         
         {/* 全局导航栏 */}
         <div className="bg-slate-900 rounded-[32px] p-2 flex gap-2 shadow-xl overflow-x-auto no-scrollbar">
-          <button 
-            onClick={() => setActiveTab('leave')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-          >
+          <button onClick={() => setActiveTab('leave')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
             <Briefcase size={18}/> 请假系统
           </button>
-          <button 
-            onClick={() => setActiveTab('stats')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-          >
-            <BarChart3 size={18}/> 全校数据统计
+          <button onClick={() => setActiveTab('stats')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <BarChart3 size={18}/> SJKC 官方报表
           </button>
-          <button 
-            onClick={() => setActiveTab('pdf')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-          >
+          <button onClick={() => setActiveTab('pdf')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
             <FileImage size={18}/> PDF转JPG
           </button>
         </div>
 
-        {/* ========================================================= */}
-        {/* TAB 1: 老师请假系统                                       */}
-        {/* ========================================================= */}
+        {/* TAB 1: 请假系统 */}
         {activeTab === 'leave' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            
-            {authError && (
-              <div className="bg-red-50 text-red-600 p-6 rounded-3xl border-2 border-red-200 flex flex-col gap-3 shadow-sm animate-pulse">
-                <span className="font-black text-lg flex items-center gap-2"><AlertTriangle/> 🚨 云端连接错误 (离线保护模式已启动)</span>
-                <span className="font-bold text-sm text-red-500">不用慌，您可正常使用生成器，但数据无法与其他设备同步。请联系管理员开启 Firebase Authentication 匿名登录功能。</span>
-              </div>
-            )}
-
+          <div className="space-y-6 animate-in fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                   老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.3</span>
-                </h1>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
-                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端连线正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线保护模式</span>}
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.4</span></h1>
+                <p className="text-slate-400 text-xs font-bold mt-1 flex items-center gap-2">
+                    {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端同步正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线模式</span>}
                 </p>
               </div>
-              <button 
-                onClick={() => setShowHistory(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95"
-              >
+              <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
                 <History size={18}/> 历史存档记录
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-7 space-y-6 overflow-hidden">
-                <h2 className="text-lg font-black text-slate-700 flex items-center gap-2 border-b pb-4 mb-2">
-                  <FileText className="text-blue-500" size={20}/> 资料输入
-                </h2>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-7 space-y-6">
+                <h2 className="text-lg font-black text-slate-700 flex items-center gap-2 border-b pb-4"><FileText className="text-blue-500" size={20}/> 资料输入</h2>
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">教师姓名</label>
-                    <div className="flex items-center gap-2 w-full">
-                      <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 min-w-0 p-3.5 bg-slate-50 border rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">教师姓名</label>
+                    <div className="flex items-center gap-2">
+                      <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="flex-1 p-3.5 bg-slate-50 border rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-500">
                         {sortedTeachers.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <button onClick={() => setShowManager('teachers')} className="p-3.5 bg-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex-shrink-0">
-                        <Settings size={22}/>
-                      </button>
+                      <button onClick={() => setShowManager('teachers')} className="p-3.5 bg-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 flex-shrink-0"><Settings size={22}/></button>
                     </div>
                   </div>
-
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">请假种类</label>
-                    <div className="flex items-center gap-2 w-full">
-                      <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 min-w-0 p-3.5 bg-slate-50 border rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">请假种类</label>
+                    <div className="flex items-center gap-2">
+                      <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className="flex-1 p-3.5 bg-slate-50 border rounded-2xl font-black outline-none focus:ring-2 focus:ring-blue-500">
                         {leaveTypesList.map(t => <option key={t} value={t}>{t}</option>)}
                         <option value="其他 (Lain-lain)">其他 (手动输入) ✏️</option>
                       </select>
-                      <button onClick={() => setShowManager('leaves')} className="p-3.5 bg-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex-shrink-0">
-                        <Settings size={22}/>
-                      </button>
+                      <button onClick={() => setShowManager('leaves')} className="p-3.5 bg-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 flex-shrink-0"><Settings size={22}/></button>
                     </div>
-                    {leaveType === "其他 (Lain-lain)" && (
-                      <input type="text" placeholder="输入假期名称..." value={customLeaveType} onChange={e => setCustomLeaveType(e.target.value)} className="w-full mt-2 p-3.5 bg-slate-50 border rounded-2xl font-black uppercase outline-none focus:ring-2 focus:ring-blue-500"/>
-                    )}
+                    {leaveType === "其他 (Lain-lain)" && <input type="text" placeholder="输入假期名称..." value={customLeaveType} onChange={e => setCustomLeaveType(e.target.value)} className="w-full mt-2 p-3.5 bg-slate-50 border rounded-2xl font-black uppercase outline-none focus:ring-2 focus:ring-blue-500"/>}
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">开始日期</label>
@@ -470,40 +441,30 @@ export default function App() {
                       <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} className="w-full p-3.5 bg-slate-50 border rounded-2xl font-bold text-sm outline-none"/>
                     </div>
                   </div>
-
-                  {leaveType !== "CUTI REHAT KHAS" && !leaveType.includes("CUTI REHAT") && (
+                  {leaveType !== "CUTI REHAT KHAS" && !leaveType.includes("CUTI REHAT") && !leaveType.includes("BERSALIN") && !leaveType.includes("KECEMASAN") && (
                     <div className="space-y-3 pt-2">
-                      <label className="flex items-center justify-between p-4 bg-blue-50/50 border border-blue-100 rounded-2xl cursor-pointer hover:bg-blue-50 transition-all">
+                      <label className="flex items-center justify-between p-4 bg-blue-50/50 border border-blue-100 rounded-2xl cursor-pointer">
                         <span className="text-sm font-black text-blue-700 flex items-center gap-2"><Clock size={18}/> 具体时间 (Optional)</span>
-                        <input type="checkbox" checked={useTime} onChange={e => setUseTime(e.target.checked)} className="w-6 h-6 accent-blue-600 cursor-pointer"/>
+                        <input type="checkbox" checked={useTime} onChange={e => setUseTime(e.target.checked)} className="w-6 h-6 accent-blue-600"/>
                       </label>
                       {useTime && (
-                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="p-4 bg-slate-50 border rounded-2xl space-y-4 animate-in fade-in">
                           <div className="grid grid-cols-2 gap-3">
                             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="p-3 border rounded-xl font-black outline-none focus:ring-2 focus:ring-blue-500"/>
-                            <input type="time" value={endTime} disabled={isSelesai} onChange={e => setEndTime(e.target.value)} className={`p-3 border rounded-xl font-black outline-none focus:ring-2 focus:ring-blue-500 ${isSelesai ? 'opacity-30' : ''}`}/>
+                            <input type="time" value={endTime} disabled={isSelesai} onChange={e => setEndTime(e.target.value)} className={`p-3 border rounded-xl font-black outline-none ${isSelesai ? 'opacity-30' : ''}`}/>
                           </div>
-                          <label className="flex items-center gap-2 text-xs font-black text-slate-500 cursor-pointer">
-                            <input type="checkbox" checked={isSelesai} onChange={e => setIsSelesai(e.target.checked)} className="w-4 h-4 accent-orange-500"/> 
-                            直到活动结束 (SELESAI)
-                          </label>
+                          <label className="flex items-center gap-2 text-xs font-black text-slate-500"><input type="checkbox" checked={isSelesai} onChange={e => setIsSelesai(e.target.checked)} className="w-4 h-4 accent-orange-500"/> 直到活动结束 (SELESAI)</label>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               </div>
-
               <div className="flex flex-col gap-6">
                 <div className="bg-[#efeae2] rounded-[32px] p-7 border border-slate-200 shadow-sm flex-1 flex flex-col">
                   <h2 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">📱 预览 (TG加粗生效)</h2>
-                  <div className="flex-1 bg-[#d9fdd3] text-[#111b21] p-6 rounded-2xl rounded-tl-none shadow-sm text-lg leading-relaxed whitespace-pre-wrap font-bold border-l-4 border-green-400">
-                    {finalMessage}
-                  </div>
-                  <button 
-                    onClick={copyAndSave}
-                    className={`w-full mt-8 py-5 rounded-[24px] font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 ${copiedStatus ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                  >
+                  <div className="flex-1 bg-[#d9fdd3] text-[#111b21] p-6 rounded-2xl rounded-tl-none shadow-sm text-lg leading-relaxed whitespace-pre-wrap font-bold border-l-4 border-green-400">{finalMessage}</div>
+                  <button onClick={copyAndSave} className={`w-full mt-8 py-5 rounded-[24px] font-black text-xl transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 ${copiedStatus ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                     {copiedStatus ? <><CheckCircle2/> 已复制！</> : <><ClipboardCopy/> 复制并存档</>}
                   </button>
                 </div>
@@ -513,177 +474,173 @@ export default function App() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: 全校数据统计 (穿透钻取版)                           */}
+        {/* TAB 2: SJKC 官方报表 (完美还原版)                         */}
         {/* ========================================================= */}
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-              
-              <div className="p-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                 <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
-                   <BarChart3 className="text-indigo-600" size={26}/> 
-                   {statYear}年度 全校老师请假总览
-                 </h3>
-                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                       <input 
-                         type="text" 
-                         placeholder="搜寻老师名字..." 
-                         value={statSearch} 
-                         onChange={e => setStatSearch(e.target.value)} 
-                         className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all" 
-                       />
-                    </div>
-                    <select 
-                      value={statYear} 
-                      onChange={e => setStatYear(e.target.value)} 
-                      className="px-6 py-3 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all cursor-pointer text-center"
-                    >
-                       {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
-                    </select>
-                 </div>
-              </div>
-
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto relative bg-white">
-                <table className="w-full text-left border-collapse">
-                  <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm">
-                    <tr className="text-[11px] uppercase tracking-widest text-slate-500">
-                      <th className="p-4 font-black border-b whitespace-nowrap min-w-[200px]">教师姓名</th>
-                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-blue-600">Cuti Rehat (天)</th>
-                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-orange-600">CRK (天)</th>
-                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-green-600">病假 C.Sakit (天)</th>
-                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-slate-600">Time-Slip (次)</th>
-                      <th className="p-4 font-black border-b text-center whitespace-nowrap text-purple-600">其他 (次)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredStats.map((row, i) => (
-                      <tr key={row.name} className={`border-b border-slate-100 transition-colors hover:bg-indigo-50/50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                        <td className="p-4 font-black text-slate-800 whitespace-nowrap">{row.name}</td>
-                        
-                        <td className="p-4 text-center font-bold text-blue-600">
-                          {row.CR_days > 0 ? (
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CR' })} className="bg-blue-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-blue-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
-                              {row.CR_days} 天 <MousePointerClick size={12}/>
-                            </button>
-                          ) : <span className="text-slate-300">-</span>}
-                        </td>
-                        
-                        <td className="p-4 text-center font-bold text-orange-600">
-                          {row.CRK_days > 0 ? (
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK' })} className="bg-orange-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-orange-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
-                              {row.CRK_days} 天 <MousePointerClick size={12}/>
-                            </button>
-                          ) : <span className="text-slate-300">-</span>}
-                        </td>
-                        
-                        <td className="p-4 text-center font-bold text-green-600">
-                          {row.SAKIT_days > 0 ? (
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'SAKIT' })} className="bg-green-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-green-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
-                              {row.SAKIT_days} 天 <MousePointerClick size={12}/>
-                            </button>
-                          ) : <span className="text-slate-300">-</span>}
-                        </td>
-                        
-                        <td className="p-4 text-center font-bold text-slate-600">
-                          {row.TIMESLIP_times > 0 ? (
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'TIMESLIP' })} className="bg-slate-200 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-slate-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
-                              {row.TIMESLIP_times} 次 <MousePointerClick size={12}/>
-                            </button>
-                          ) : <span className="text-slate-300">-</span>}
-                        </td>
-                        
-                        <td className="p-4 text-center font-bold text-purple-600">
-                          {row.OTHER_times > 0 ? (
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'OTHER' })} className="bg-purple-100 px-3 py-1.5 rounded-lg hover:ring-2 hover:ring-purple-400 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm flex items-center gap-1 mx-auto">
-                              {row.OTHER_times} 次 <MousePointerClick size={12}/>
-                            </button>
-                          ) : <span className="text-slate-300">-</span>}
-                        </td>
-
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredStats.length === 0 && (
-                  <div className="text-center p-16 flex flex-col items-center justify-center opacity-50">
-                    <Search size={48} className="mb-4 text-slate-400"/>
-                    <p className="text-slate-500 font-black text-lg">没有找到匹配的老师</p>
+            {/* 控制台 */}
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+               <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
+                 <BarChart3 className="text-indigo-600" size={26}/> 月度考勤分析报表
+               </h3>
+               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-48">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                     <input type="text" placeholder="搜寻老师..." value={statSearch} onChange={e => setStatSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
-                )}
-              </div>
-              <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs font-bold text-slate-400">
-                 💡 提示：点击表单中高亮的数字徽章，即可查阅该假期所有历史记录的详细日期。
-              </div>
+                  <div className="flex gap-2">
+                    <select value={statMonth} onChange={e => setStatMonth(e.target.value)} className="px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                      {bulanMelayu.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                    </select>
+                    <select value={statYear} onChange={e => setStatYear(e.target.value)} className="px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                      {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
+                    </select>
+                  </div>
+               </div>
             </div>
 
+            {/* SJKC 官方表格 */}
+            <div className="bg-white p-2 sm:p-4 rounded-[32px] shadow-lg border border-slate-200 overflow-x-auto relative">
+              <table className="w-full min-w-[900px] border-collapse text-sm text-black border-2 border-black">
+                <thead>
+                  {/* 大标题 */}
+                  <tr>
+                    <th colSpan="8" className="bg-[#fce5cd] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
+                      ANALISIS CUTI GURU DAN AKP SJKC CHUNG HWA KOTA KINABALU BAGI BULAN {bulanString} {statYear}
+                    </th>
+                  </tr>
+                  
+                  {/* 表头结构还原 */}
+                  <tr className="text-center font-black">
+                    <th rowSpan="3" className="bg-[#ffe599] border-2 border-black w-12 px-2 py-2">NO</th>
+                    <th rowSpan="3" className="bg-[#ffe599] border-2 border-black px-4 py-2 min-w-[200px]">NAMA GURU</th>
+                    <th colSpan="4" className="bg-[#f4cccc] border-2 border-black py-2">{bulanString} {statYear}</th>
+                    <th rowSpan="3" className="bg-[#9fc5e8] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI DARI<br/>BULAN<br/>SEBELUMNYA</th>
+                    <th rowSpan="3" className="bg-[#00ffff] border-2 border-black px-3 py-2 w-32 leading-snug">JUMLAH CUTI AKHIR<br/>BULAN {bulanString}<br/>{statYear}</th>
+                  </tr>
+                  <tr className="text-center font-black">
+                    <th colSpan="4" className="bg-[#f4cccc] border-2 border-black py-1.5">JENIS CUTI</th>
+                  </tr>
+                  <tr className="text-center font-black text-xs leading-snug">
+                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-36">CRK/ CR/CUTI<br/>KECEMASAN/<br/>CTR (KELOMPOK)</th>
+                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI SAKIT</th>
+                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">TIME SLIP</th>
+                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI BERSALIN</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {filteredSjkcStats.map((row, index) => {
+                    const totalAkhir = row.prev_crk_cr + row.cur_crk_cr; // 截至目前的总计
+                    return (
+                      <tr key={row.name} className="hover:bg-slate-100 transition-colors">
+                        <td className="border border-black text-center font-medium py-2">{index + 1}</td>
+                        <td className="border border-black px-3 font-bold">{row.name}</td>
+                        
+                        {/* 当月 CRK 类 */}
+                        <td className="border border-black text-center font-bold text-lg">
+                          {row.cur_crk_cr > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'cur' })} className="text-red-600 hover:bg-red-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
+                              {row.cur_crk_cr} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+                        
+                        {/* 当月 病假 */}
+                        <td className="border border-black text-center font-bold text-lg">
+                          {row.cur_sakit > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'SAKIT', monthFilter: 'cur' })} className="text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
+                              {row.cur_sakit} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+                        
+                        {/* 当月 Time Slip */}
+                        <td className="border border-black text-center font-bold text-lg">
+                          {row.cur_timeslip > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'TIMESLIP', monthFilter: 'cur' })} className="text-slate-600 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
+                              {row.cur_timeslip} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+                        
+                        {/* 当月 产假 */}
+                        <td className="border border-black text-center font-bold text-lg">
+                          {row.cur_bersalin > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'BERSALIN', monthFilter: 'cur' })} className="text-purple-600 hover:bg-purple-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
+                              {row.cur_bersalin} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+                        
+                        {/* 之前月份累积 (点击看1月到上月的明细) */}
+                        <td className="border border-black bg-[#f0f8ff] text-center font-black text-lg">
+                          {row.prev_crk_cr > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {row.prev_crk_cr}
+                            </button>
+                          ) : ""}
+                        </td>
+
+                        {/* 总计 (点击看今年总明细) */}
+                        <td className="border border-black bg-[#e0ffff] text-center font-black text-xl text-teal-800">
+                          {totalAkhir > 0 ? (
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'total' })} className="hover:bg-teal-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {totalAkhir}
+                            </button>
+                          ) : ""}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filteredSjkcStats.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+                  <p className="text-slate-500 font-black text-lg">没有找到该老师的数据</p>
+                </div>
+              )}
+            </div>
+            <div className="text-center text-xs font-bold text-slate-400 mt-2">
+              💡 提示：本报表算法严格遵循 SJKC 格式。点击有数字的格子，即可“穿透”查看每次假期的具体日期明细。
+            </div>
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 3: PDF 转 JPG 工具                                    */}
-        {/* ========================================================= */}
+        {/* TAB 3: PDF 工具 */}
         {activeTab === 'pdf' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="space-y-6 animate-in fade-in">
             <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                <FileUp size={32} />
-              </div>
+              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2"><FileUp size={32} /></div>
               <h2 className="text-2xl font-black text-slate-800">上传公函 (PDF)</h2>
-              <p className="text-slate-500 font-medium text-sm max-w-md mx-auto">
-                完全在您的设备本地高速转换，绝不上传任何服务器，100% 保障学校机密安全。
-              </p>
-              
-              <div className="pt-6">
-                <label className="inline-flex items-center justify-center gap-3 px-8 py-4 bg-orange-500 text-white font-black text-lg rounded-2xl cursor-pointer hover:bg-orange-600 transition-all shadow-lg active:scale-95">
+              <div className="pt-4">
+                <label className="inline-flex items-center gap-3 px-8 py-4 bg-orange-500 text-white font-black text-lg rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg active:scale-95 transition-all">
                   <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} />
-                  {isConverting ? <Loader2 className="animate-spin" /> : <ImageIcon />}
-                  {isConverting ? '正在高速转换中...' : '选择 PDF 文件'}
+                  {isConverting ? <Loader2 className="animate-spin" /> : <ImageIcon />} {isConverting ? '处理中...' : '选择 PDF 文件'}
                 </label>
               </div>
             </div>
 
             {pdfImages.length > 0 && (
               <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 space-y-8 animate-in zoom-in-95">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-6 gap-4">
-                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                    <CheckCircle2 className="text-green-500"/> 转换成功 ({pdfImages.length} 页)
-                  </h3>
-                  
-                  {/* 一键打包 ZIP 按钮 */}
+                <div className="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><CheckCircle2 className="text-green-500"/> 转换成功 ({pdfImages.length} 页)</h3>
                   {pdfImages.length > 1 && (
-                    <button 
-                      onClick={downloadAllAsZip}
-                      disabled={isZipping}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-white transition-all shadow-md ${isZipping ? 'bg-slate-400' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
-                    >
-                      {isZipping ? <Loader2 size={18} className="animate-spin" /> : <Archive size={18} />}
-                      {isZipping ? '正在打包压缩...' : '一键打包下载 (ZIP)'}
+                    <button onClick={downloadAllAsZip} disabled={isZipping} className="flex items-center gap-2 px-6 py-3 rounded-xl font-black text-white bg-orange-500 hover:bg-orange-600 active:scale-95 transition-all shadow-md">
+                      {isZipping ? <Loader2 size={18} className="animate-spin" /> : <Archive size={18} />} {isZipping ? '打包中...' : '一键打包 (ZIP)'}
                     </button>
                   )}
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {pdfImages.map((imgSrc, index) => (
-                    <div key={index} className="space-y-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 shadow-sm group">
+                    <div key={index} className="space-y-4 bg-slate-50 p-4 rounded-3xl border border-slate-100 shadow-sm">
                       <div className="flex justify-between items-center px-2">
                          <span className="font-black text-slate-500 text-sm">第 {index + 1} 页</span>
-                         <button 
-                           onClick={() => downloadImage(imgSrc, index)}
-                           className="flex items-center gap-1.5 text-xs font-black bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all"
-                         >
-                           <Download size={14}/> 单张下载
-                         </button>
                       </div>
                       <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-white">
-                         <img src={imgSrc} alt={`PDF 第 ${index + 1} 页`} className="w-full h-auto object-contain" />
+                         <img src={imgSrc} alt={`Page ${index + 1}`} className="w-full h-auto object-contain" />
                       </div>
-                      <button 
-                         onClick={() => downloadImage(imgSrc, index)}
-                         className="w-full py-3 bg-slate-800 text-white rounded-xl font-black flex justify-center items-center gap-2 hover:bg-slate-700 transition-all active:scale-95"
-                      >
+                      <button onClick={() => downloadImage(imgSrc, index)} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black flex justify-center items-center gap-2 hover:bg-slate-700 transition-all active:scale-95">
                          <Download size={18}/> 存入相册/电脑
                       </button>
                     </div>
@@ -706,35 +663,27 @@ export default function App() {
                     <User className="text-indigo-500" size={24}/> {detailView.teacher}
                   </h3>
                   <p className="text-sm font-bold text-indigo-500 tracking-wider mt-1">
-                    {statYear}年 {categoryNames[detailView.category]} 明细清单
+                    {detailView.monthFilter === 'cur' ? `${bulanString} ${statYear}` : 
+                     detailView.monthFilter === 'prev' ? `累积至上个月 (${statYear}年)` :
+                     `${statYear}年全年总计`} 明细清单
                   </p>
                 </div>
-                <button onClick={() => setDetailView({ isOpen: false, teacher: '', category: '' })} className="p-3 bg-white rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition-all shadow-sm"><X size={24}/></button>
+                <button onClick={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} className="p-3 bg-white rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition-all shadow-sm"><X size={24}/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-slate-50">
                 {detailRecords.map((rec) => (
                   <div key={rec.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group relative flex items-center justify-between">
                     <div className="space-y-1 pr-10">
                       <div className="text-slate-800 font-black text-lg">{rec.type}</div>
-                      <div className="text-indigo-600 font-black flex items-center gap-2">
-                        <CalendarDays size={16}/> {rec.dateInfo}
-                      </div>
-                      <div className="text-[10px] font-black text-slate-300 mt-2">
-                         记录创建时间: {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleString() : '...'}
-                      </div>
+                      <div className="text-indigo-600 font-black flex items-center gap-2"><CalendarDays size={16}/> {rec.dateInfo}</div>
+                      <div className="text-[10px] font-black text-slate-300 mt-2">记录创建于: {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleString() : '...'}</div>
                     </div>
-                    <button 
-                      onClick={() => setRecordToDelete(rec)}
-                      className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all flex-shrink-0"
-                      title="删除此记录"
-                    >
+                    <button onClick={() => setRecordToDelete(rec)} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all" title="删除此记录">
                       <Trash2 size={20}/>
                     </button>
                   </div>
                 ))}
-                {detailRecords.length === 0 && (
-                  <div className="py-10 text-center text-slate-300 font-black">记录已被清空</div>
-                )}
+                {detailRecords.length === 0 && <div className="py-10 text-center text-slate-300 font-black">记录已被清空</div>}
               </div>
             </div>
           </div>
@@ -746,14 +695,11 @@ export default function App() {
         {recordToDelete && (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-[32px] p-8 w-full max-w-sm space-y-5 shadow-2xl">
-              <div className="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
-                 <AlertTriangle size={28} />
-              </div>
+              <div className="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4"><AlertTriangle size={28} /></div>
               <h3 className="font-black text-2xl text-slate-800">确认删除？</h3>
               <p className="text-slate-600 font-bold leading-relaxed">
-                您确定要删除 <span className="text-blue-600 px-1">{recordToDelete.teacher}</span> 的 
-                <span className="text-slate-800 px-1">{recordToDelete.type}</span> 记录吗？
-                <br/><span className="text-xs text-red-500 mt-2 block">(删除后，表盘上的总计数值也会瞬间随之减少)</span>
+                您确定要删除 <span className="text-blue-600 px-1">{recordToDelete.teacher}</span> 的 <span className="text-slate-800 px-1">{recordToDelete.type}</span> 记录吗？
+                <br/><span className="text-xs text-red-500 mt-2 block">(表盘上的总计数值将瞬间随之减少)</span>
               </p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setRecordToDelete(null)} className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all">取消</button>
@@ -771,7 +717,7 @@ export default function App() {
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
               <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                 <div>
-                  <h3 className="font-black text-2xl flex items-center gap-3 text-slate-800"><History className="text-blue-600" size={28}/> 历史存档</h3>
+                  <h3 className="font-black text-2xl flex items-center gap-3 text-slate-800"><History className="text-blue-600" size={28}/> 所有历史存档</h3>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">从这里删除记录，将同步调整统计数据</p>
                 </div>
                 <button onClick={() => setShowHistory(false)} className="p-3 bg-slate-200 rounded-full hover:bg-red-100 hover:text-red-600 transition-all"><X size={24}/></button>
@@ -792,10 +738,7 @@ export default function App() {
                            {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setRecordToDelete(rec)}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
-                      >
+                      <button onClick={() => setRecordToDelete(rec)} className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
                         <Trash2 size={20}/>
                       </button>
                     </div>
