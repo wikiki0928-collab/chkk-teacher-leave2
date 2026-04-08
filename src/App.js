@@ -72,6 +72,7 @@ export default function App() {
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
   const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString());
   const [statSearch, setStatSearch] = useState("");
+  const [statSortMode, setStatSortMode] = useState("alphabet"); // 新增：排序模式 ('alphabet' | 'cuti_desc' | 'rasmi_desc')
   const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '', monthFilter: '' });
   const [isExporting, setIsExporting] = useState(false);
 
@@ -287,6 +288,31 @@ export default function App() {
     if (!statSearch) return sjkcStats;
     return sjkcStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
   }, [sjkcStats, statSearch]);
+
+  // 新增：根据排序模式对数据进行排行榜排序
+  const sortedAndFilteredStats = useMemo(() => {
+    let result = [...filteredSjkcStats];
+    
+    if (statSortMode === 'cuti_desc') {
+      // 按照 私假总数 (JUMLAH CUTI AKHIR BULAN) 从大到小排列
+      result.sort((a, b) => {
+        const totalA = a.prev_cuti + a.cur_crk_cr + a.cur_sakit + a.cur_timeslip + a.cur_bersalin;
+        const totalB = b.prev_cuti + b.cur_crk_cr + b.cur_sakit + b.cur_timeslip + b.cur_bersalin;
+        if (totalB !== totalA) return totalB - totalA; // 数字大的排前面
+        return a.name.localeCompare(b.name); // 数字一样则按名字排
+      });
+    } else if (statSortMode === 'rasmi_desc') {
+      // 按照 公事总数 (JUMLAH CUTI RASMI AKHIR BULAN) 从大到小排列
+      result.sort((a, b) => {
+        const rasmiA = a.prev_rasmi + a.cur_rasmi;
+        const rasmiB = b.prev_rasmi + b.cur_rasmi;
+        if (rasmiB !== rasmiA) return rasmiB - rasmiA;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    // 如果是 'alphabet'，本身 filteredSjkcStats 已经是按字母排好的了，直接 return 即可
+    return result;
+  }, [filteredSjkcStats, statSortMode]);
 
   const detailRecords = useMemo(() => {
     if (!detailView.isOpen) return [];
@@ -522,11 +548,12 @@ export default function App() {
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-               <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col xl:flex-row justify-between items-center gap-4">
+               <h3 className="font-black text-slate-800 text-xl flex items-center gap-2 whitespace-nowrap">
                  <BarChart3 className="text-indigo-600" size={26}/> 月度考勤分析
                </h3>
-               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-center">
+               
+               <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto items-center flex-wrap justify-end">
                   
                   {/* 下载 PDF 按钮 */}
                   <button 
@@ -538,10 +565,22 @@ export default function App() {
                     {isExporting ? '生成中...' : '下载报表 (PDF)'}
                   </button>
 
-                  <div className="relative flex-1 sm:w-48">
+                  {/* 排序模式选择器 (新增) */}
+                  <select 
+                    value={statSortMode} 
+                    onChange={e => setStatSortMode(e.target.value)} 
+                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm"
+                  >
+                    <option value="alphabet">🔤 名字 A-Z 顺序</option>
+                    <option value="cuti_desc">📉 私假总数排行榜 (多到少)</option>
+                    <option value="rasmi_desc">📉 公事总数排行榜 (多到少)</option>
+                  </select>
+
+                  <div className="relative w-full sm:w-40">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                      <input type="text" placeholder="搜寻老师..." value={statSearch} onChange={e => setStatSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
+                  
                   <div className="flex gap-2 w-full sm:w-auto">
                     <select value={statMonth} onChange={e => setStatMonth(e.target.value)} className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                       {bulanMelayu.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
@@ -584,7 +623,8 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="bg-white">
-                  {filteredSjkcStats.map((row, index) => {
+                  {/* 这里改用 sortedAndFilteredStats */}
+                  {sortedAndFilteredStats.map((row, index) => {
                     const totalCutiAkhir = row.prev_cuti + row.cur_crk_cr + row.cur_sakit + row.cur_timeslip + row.cur_bersalin; 
                     const totalRasmiAkhir = row.prev_rasmi + row.cur_rasmi; 
                     return (
