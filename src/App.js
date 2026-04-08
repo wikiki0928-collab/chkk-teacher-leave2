@@ -80,6 +80,7 @@ export default function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -331,9 +332,8 @@ export default function App() {
     }, 300);
   };
 
-  const handlePdfUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || file.type !== 'application/pdf') return;
+  const processPdfFile = async (file) => {
+    if (file.type !== 'application/pdf') return showToast("❌ 请上传有效的 PDF 文件！");
     if (!pdfjsLoaded) return showToast('⏳ 引擎准备中...');
     setIsConverting(true); setPdfImages([]);
     try {
@@ -355,6 +355,28 @@ export default function App() {
       };
       reader.readAsArrayBuffer(file);
     } catch (error) { setIsConverting(false); showToast("❌ 转换失败。"); }
+  };
+
+  const handlePdfUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) processPdfFile(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processPdfFile(file);
   };
 
   const downloadImage = (dataUrl, index) => {
@@ -640,12 +662,21 @@ export default function App() {
 
         {/* TAB 3: PDF 工具 */}
         {activeTab === 'pdf' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2"><FileUp size={32} /></div>
-              <h2 className="text-2xl font-black text-slate-800">上传公函 (PDF)</h2>
-              <div className="pt-4">
-                <label className="inline-flex items-center gap-3 px-8 py-4 bg-orange-500 text-white font-black text-lg rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg active:scale-95 transition-all">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <div 
+              className={`bg-white rounded-[32px] shadow-sm border-2 border-dashed p-8 text-center space-y-4 transition-all duration-300 ${isDragging ? 'border-orange-500 bg-orange-50 scale-[1.02]' : 'border-slate-200'}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2 pointer-events-none"><FileUp size={32} /></div>
+              <h2 className="text-2xl font-black text-slate-800 pointer-events-none">上传公函 (PDF)</h2>
+              <p className="text-slate-500 font-medium text-sm max-w-md mx-auto pointer-events-none">
+                {isDragging ? '✨ 放开鼠标，立即转换！' : '将 PDF 文件拖拽到此处，或者点击下方按钮选择。完全在本地转换，保障机密安全。'}
+              </p>
+              
+              <div className="pt-6">
+                <label className="inline-flex items-center justify-center gap-3 px-8 py-4 bg-orange-500 text-white font-black text-lg rounded-2xl cursor-pointer hover:bg-orange-600 shadow-lg active:scale-95 transition-all">
                   <input type="file" accept="application/pdf" className="hidden" onChange={handlePdfUpload} />
                   {isConverting ? <Loader2 className="animate-spin" /> : <ImageIcon />} {isConverting ? '处理中...' : '选择 PDF 文件'}
                 </label>
