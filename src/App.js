@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive, MousePointerClick } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive, MousePointerClick, Printer } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -21,9 +21,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
-// 基础名单库
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
-// 新增了 CUTI BERSALIN 和 CUTI KECEMASAN 以配合报表
 const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "CUTI BERSALIN", "CUTI KECEMASAN", "BENGKEL", "TAKLIMAT"];
 const bulanMelayu = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
 
@@ -39,6 +37,7 @@ const countWorkDays = (start, end) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('leave'); 
+  const tableRef = useRef(null); // 用于截图/导出PDF的引用
 
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
@@ -68,19 +67,20 @@ export default function App() {
   const [isSelesai, setIsSelesai] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
 
-  // 统计系统状态 (精确到月份)
-  const currentJsMonth = new Date().getMonth(); // 0-11
+  // 统计系统状态
+  const currentJsMonth = new Date().getMonth();
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
-  const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString()); // 1-12
+  const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString());
   const [statSearch, setStatSearch] = useState("");
   const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '', monthFilter: '' });
+  const [isExporting, setIsExporting] = useState(false);
 
+  // PDF 工具状态
   const [pdfImages, setPdfImages] = useState([]);
   const [isConverting, setIsConverting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
-  // 初始化认证
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -97,7 +97,6 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
-  // 监听云端
   useEffect(() => {
     if (!user) return; 
     setIsSyncing(true);
@@ -125,7 +124,7 @@ export default function App() {
     return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
   }, [user]);
 
-  // 加载引擎
+  // 加载外部引擎 (PDF.js, JSZip, html2pdf)
   useEffect(() => {
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
@@ -141,6 +140,12 @@ export default function App() {
       const scriptZip = document.createElement('script');
       scriptZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
       document.body.appendChild(scriptZip);
+    }
+
+    if (!window.html2pdf) {
+      const scriptPdf = document.createElement('script');
+      scriptPdf.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      document.body.appendChild(scriptPdf);
     }
   }, []);
 
@@ -209,9 +214,6 @@ export default function App() {
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
   };
 
-  // =====================================
-  // SJKC 官方报表统计算法
-  // =====================================
   const availableYears = useMemo(() => {
     const years = new Set([new Date().getFullYear().toString()]);
     historyRecords.forEach(rec => {
@@ -221,13 +223,11 @@ export default function App() {
     return Array.from(years).sort().reverse();
   }, [historyRecords]);
 
-  // 假期分类逻辑
   const getRecordCategory = (typeString) => {
     const type = typeString.toUpperCase();
     if (type.includes("BERSALIN")) return 'BERSALIN';
     if (type.includes("SAKIT")) return 'SAKIT';
     if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) return 'TIMESLIP';
-    // SJKC 经典合并：CRK, CR, KECEMASAN, CTR 算在一起
     if (type.includes("REHAT KHAS") || type === "CRK" || type.includes("CUTI REHAT") || type.includes("KECEMASAN") || type.includes("CTR")) return 'CRK_CR';
     return 'OTHER';
   };
@@ -235,14 +235,7 @@ export default function App() {
   const sjkcStats = useMemo(() => {
     const statsMap = {};
     sortedTeachers.forEach(t => {
-      statsMap[t] = { 
-        name: t, 
-        prev_crk_cr: 0, 
-        cur_crk_cr: 0, 
-        cur_sakit: 0, 
-        cur_timeslip: 0, 
-        cur_bersalin: 0 
-      };
+      statsMap[t] = { name: t, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
     });
 
     historyRecords.forEach(rec => {
@@ -256,9 +249,7 @@ export default function App() {
       const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) {
-        statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
-      }
+      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
@@ -275,11 +266,7 @@ export default function App() {
 
       const category = getRecordCategory(rec.type);
 
-      // 计算之前的累积假期 (Jan 到 上个月)
-      if (recMonth < selMonth && category === 'CRK_CR') {
-        statsMap[tName].prev_crk_cr += days;
-      } 
-      // 计算本月假期
+      if (recMonth < selMonth && category === 'CRK_CR') statsMap[tName].prev_crk_cr += days;
       else if (recMonth === selMonth) {
         if (category === 'CRK_CR') statsMap[tName].cur_crk_cr += days;
         else if (category === 'SAKIT') statsMap[tName].cur_sakit += days;
@@ -296,7 +283,6 @@ export default function App() {
     return sjkcStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
   }, [sjkcStats, statSearch]);
 
-  // 钻取明细记录过滤
   const detailRecords = useMemo(() => {
     if (!detailView.isOpen) return [];
     return historyRecords.filter(rec => {
@@ -314,6 +300,35 @@ export default function App() {
       return getRecordCategory(rec.type) === detailView.category;
     });
   }, [historyRecords, detailView, statYear, statMonth]);
+
+  // 导出 PDF 核心逻辑
+  const exportToPDF = () => {
+    if (!window.html2pdf || !tableRef.current) return showToast("⏳ PDF导出引擎准备中...");
+    
+    setIsExporting(true);
+    showToast("⏳ 正在为您生成高清 PDF，请稍候...");
+
+    // 稍微延迟一下，让 React 渲染完“导出模式”的无按钮界面
+    setTimeout(() => {
+      const element = tableRef.current;
+      const opt = {
+        margin:       10,
+        filename:     `全校数据统计_${bulanMelayu[parseInt(statMonth) - 1]}_${statYear}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // 横向打印最适合这种宽表格
+      };
+
+      window.html2pdf().set(opt).from(element).save().then(() => {
+        setIsExporting(false);
+        showToast("✅ PDF 报表已成功下载！");
+      }).catch(err => {
+        console.error(err);
+        setIsExporting(false);
+        showToast("❌ 导出失败，请重试");
+      });
+    }, 300);
+  };
 
   const handlePdfUpload = async (e) => {
     const file = e.target.files[0];
@@ -385,7 +400,7 @@ export default function App() {
             <Briefcase size={18}/> 请假系统
           </button>
           <button onClick={() => setActiveTab('stats')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-            <BarChart3 size={18}/> SJKC 官方报表
+            <BarChart3 size={18}/> 全校数据统计
           </button>
           <button onClick={() => setActiveTab('pdf')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
             <FileImage size={18}/> PDF转JPG
@@ -397,7 +412,7 @@ export default function App() {
           <div className="space-y-6 animate-in fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.4</span></h1>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.5</span></h1>
                 <p className="text-slate-400 text-xs font-bold mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端同步正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线模式</span>}
                 </p>
@@ -473,45 +488,50 @@ export default function App() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 2: SJKC 官方报表 (完美还原版)                         */}
-        {/* ========================================================= */}
+        {/* TAB 2: 全校数据统计 (导出PDF版) */}
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
-            {/* 控制台 */}
             <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
                <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
-                 <BarChart3 className="text-indigo-600" size={26}/> 月度考勤分析报表
+                 <BarChart3 className="text-indigo-600" size={26}/> 月度考勤分析
                </h3>
-               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-center">
+                  
+                  {/* 下载 PDF 按钮 */}
+                  <button 
+                    onClick={exportToPDF}
+                    disabled={isExporting}
+                    className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-black text-white w-full sm:w-auto shadow-md transition-all ${isExporting ? 'bg-slate-400' : 'bg-teal-500 hover:bg-teal-600 active:scale-95'}`}
+                  >
+                    {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
+                    {isExporting ? '生成中...' : '下载报表 (PDF)'}
+                  </button>
+
                   <div className="relative flex-1 sm:w-48">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                      <input type="text" placeholder="搜寻老师..." value={statSearch} onChange={e => setStatSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                   </div>
-                  <div className="flex gap-2">
-                    <select value={statMonth} onChange={e => setStatMonth(e.target.value)} className="px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <select value={statMonth} onChange={e => setStatMonth(e.target.value)} className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                       {bulanMelayu.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
                     </select>
-                    <select value={statYear} onChange={e => setStatYear(e.target.value)} className="px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                    <select value={statYear} onChange={e => setStatYear(e.target.value)} className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 text-white border border-indigo-700 rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                       {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
                     </select>
                   </div>
                </div>
             </div>
 
-            {/* SJKC 官方表格 */}
-            <div className="bg-white p-2 sm:p-4 rounded-[32px] shadow-lg border border-slate-200 overflow-x-auto relative">
+            {/* 用 ref 包裹需要导出成 PDF 的区域 */}
+            <div ref={tableRef} className="bg-white p-2 sm:p-4 rounded-[32px] shadow-lg border border-slate-200 overflow-x-auto relative" style={{ backgroundColor: 'white' }}>
               <table className="w-full min-w-[900px] border-collapse text-sm text-black border-2 border-black">
                 <thead>
-                  {/* 大标题 */}
                   <tr>
                     <th colSpan="8" className="bg-[#fce5cd] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
                       ANALISIS CUTI GURU DAN AKP SJKC CHUNG HWA KOTA KINABALU BAGI BULAN {bulanString} {statYear}
                     </th>
                   </tr>
-                  
-                  {/* 表头结构还原 */}
                   <tr className="text-center font-black">
                     <th rowSpan="3" className="bg-[#ffe599] border-2 border-black w-12 px-2 py-2">NO</th>
                     <th rowSpan="3" className="bg-[#ffe599] border-2 border-black px-4 py-2 min-w-[200px]">NAMA GURU</th>
@@ -531,60 +551,60 @@ export default function App() {
                 </thead>
                 <tbody className="bg-white">
                   {filteredSjkcStats.map((row, index) => {
-                    const totalAkhir = row.prev_crk_cr + row.cur_crk_cr; // 截至目前的总计
+                    const totalAkhir = row.prev_crk_cr + row.cur_crk_cr; 
                     return (
                       <tr key={row.name} className="hover:bg-slate-100 transition-colors">
                         <td className="border border-black text-center font-medium py-2">{index + 1}</td>
                         <td className="border border-black px-3 font-bold">{row.name}</td>
                         
-                        {/* 当月 CRK 类 */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_crk_cr > 0 ? (
+                            isExporting ? <span className="text-red-600">{row.cur_crk_cr}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'cur' })} className="text-red-600 hover:bg-red-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
                               {row.cur_crk_cr} <MousePointerClick size={12} className="opacity-50"/>
                             </button>
                           ) : ""}
                         </td>
                         
-                        {/* 当月 病假 */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_sakit > 0 ? (
+                            isExporting ? <span className="text-blue-600">{row.cur_sakit}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'SAKIT', monthFilter: 'cur' })} className="text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
                               {row.cur_sakit} <MousePointerClick size={12} className="opacity-50"/>
                             </button>
                           ) : ""}
                         </td>
                         
-                        {/* 当月 Time Slip */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_timeslip > 0 ? (
+                            isExporting ? <span className="text-slate-600">{row.cur_timeslip}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'TIMESLIP', monthFilter: 'cur' })} className="text-slate-600 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
                               {row.cur_timeslip} <MousePointerClick size={12} className="opacity-50"/>
                             </button>
                           ) : ""}
                         </td>
                         
-                        {/* 当月 产假 */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_bersalin > 0 ? (
+                            isExporting ? <span className="text-purple-600">{row.cur_bersalin}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'BERSALIN', monthFilter: 'cur' })} className="text-purple-600 hover:bg-purple-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
                               {row.cur_bersalin} <MousePointerClick size={12} className="opacity-50"/>
                             </button>
                           ) : ""}
                         </td>
                         
-                        {/* 之前月份累积 (点击看1月到上月的明细) */}
                         <td className="border border-black bg-[#f0f8ff] text-center font-black text-lg">
                           {row.prev_crk_cr > 0 ? (
+                            isExporting ? <span className="text-blue-800">{row.prev_crk_cr}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
                               {row.prev_crk_cr}
                             </button>
                           ) : ""}
                         </td>
 
-                        {/* 总计 (点击看今年总明细) */}
                         <td className="border border-black bg-[#e0ffff] text-center font-black text-xl text-teal-800">
                           {totalAkhir > 0 ? (
+                            isExporting ? <span>{totalAkhir}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'total' })} className="hover:bg-teal-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
                               {totalAkhir}
                             </button>
@@ -595,14 +615,14 @@ export default function App() {
                   })}
                 </tbody>
               </table>
-              {filteredSjkcStats.length === 0 && (
+              {filteredSjkcStats.length === 0 && !isExporting && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
                   <p className="text-slate-500 font-black text-lg">没有找到该老师的数据</p>
                 </div>
               )}
             </div>
             <div className="text-center text-xs font-bold text-slate-400 mt-2">
-              💡 提示：本报表算法严格遵循 SJKC 格式。点击有数字的格子，即可“穿透”查看每次假期的具体日期明细。
+              💡 提示：点击“下载报表(PDF)”即可获取完美适配 A4 纸比例的高清档案，可直接发群组或打印。
             </div>
           </div>
         )}
@@ -651,9 +671,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* Modal: 穿透数据明细窗口 (Data Drill-down)                  */}
-        {/* ========================================================= */}
+        {/* Modal: 穿透数据明细窗口 */}
         {detailView.isOpen && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[55] p-4 animate-in fade-in">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
@@ -689,9 +707,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* Modal: 自定义确认删除                                      */}
-        {/* ========================================================= */}
+        {/* Modal: 自定义确认删除 */}
         {recordToDelete && (
           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-[32px] p-8 w-full max-w-sm space-y-5 shadow-2xl">
@@ -709,9 +725,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* Modal: 历史与管理 (共用)                                   */}
-        {/* ========================================================= */}
+        {/* Modal: 历史与管理 (共用) */}
         {showHistory && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
