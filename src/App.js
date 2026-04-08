@@ -22,7 +22,7 @@ const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'chkk-teacher-leave';
 
 const rawTeachers = ["TAI NYIT WUN", "WONG CHUN LIN", "TEO AH BAN", "JACKSON YONG THAU BING", "SOH LEH CHING", "CHEOW JACK SHIUNG @ TONY", "HO CHIN FONG", "WINNIE KONG FUI LING", "WONG LI CHUN", "MARY GAN FAN SHING", "NICHOLAS WONG YIP FOO", "AU JIA PEI", "YAW TECK HING", "YONG LOI CHAING", "FAM SIAW SHYI", "SHIM SOO SHING", "LIM WAI KUN", "DARMAWANGSHAH B. DJONI", "LIZA PANG CHUI FEN", "CHONG VEN YAN", "TAI MUN FUNG", "CH’NG JOO KENG", "CHAI SU YIN", "CHANG SHUK YEE", "FOOH TING TING", "GOH YEE WEI", "HENG SAU VUI", "KERRY YONG KA LIE", "KONG TAIN YIN", "KIEW HUNG TING", "KU CHOON FONG", "KUAN SIEW FONG", "NG MEI SHUEN", "QUALK VUI LEONG", "NURIDAYU BINTI SHAPI", "SOH YEE CHEW", "WENDY CHAI WEN LEE", "WONG KA YUN", "YONG CHI KONG", "YAPP SHING TORNG", "GOH WAN YING", "TSEU SHIAU HWEI", "CHEA SHIAU HAN", "JOSEPHINE LEE YEN CHUN", "KO LEE SAN @ KU LEE SAN", "LEE KAH VUN", "VIVIAN LEE YIN YIN", "SHIRLEY LIEW SEE NEE", "FUNG FUI YEN", "CHUNG FUI PENG", "LIM SIEN YING", "MARRYANN SIAW JIN HA", "SUSANNA CHAI SIAW YEE", "PANG NAI WEN", "KWOK FUI YUN", "ERVINA LEE FUI THENG", "CHIN TZE CAI", "ELLEN CHAM SHWU YU", "HERICA LEE SHIN YEE", "JOYCE TAY ING TING", "YAP KAY CHI", "CHONG CHEE HYUNG", "CHAU FOOK TSHIN", "LEONG SIAW TENG", "TIONG KA MING", "FANNY CHAO SHUK HUN", "LO LI HWANG", "CHUNG CHING FUI", "CHUNG FONG KENG", "ERINA KAN GEN LING", "KAREN THIEN HSIAO JEN", "LAW YIING YIING", "CHONG SU HA", "WONG SY YEE", "HUNG ME LAN", "ONG OI PING", "LIEW SIOK TENG", "CHONG SIAU YING", "WONG YUN XUAN", "WONG YIT TING", "LIEW SIAW MUI", "TAN LAI SIM", "ANNIE WONG SU YEE", "LIM THAU HIONG", "SYLVIA CHU TZE LUI", "LIEW SHIAU FEI", "HOH MEI YOKE", "MAHARI BIN ABU BAKAR", "MUHAMMAD AIMAN HIDAYAT BIN MD NAZRI", "NOR RAYSHA BINTI ABU BAKAR", "LIEW ZI YEW", "MICHELLE LIAW SU KEE", "LO YEN FUI", "SUZANAH BINTI HANI", "AZIANAH BINTI ABD. SALIM", "JOAN VIANNEY JOSEPH", "MOHAMMAD NAJIB BIN JAMMAN", "LILY GOSIMIN", "MOHD. ZAILANIE BIN ABDUL LAMAN", "JONG FUNG LEN", "BAHAROM HJ.MARKHAN", "MOHD AFANDI BIN RAIMI", "SABDIN BIN TAJUDIN", "RACHEL YIXUAN YONG", "DOUGLAS LIM RI HARN", "NUR AUNI AMIRAH BINTI MOHD ATID", "SHIRLIE HO SI ZHEN", "WU FEI CHIN"];
-const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "CUTI BERSALIN", "CUTI KECEMASAN", "BENGKEL", "TAKLIMAT"];
+const rawLeaveTypes = ["CUTI REHAT KHAS", "CUTI REHAT", "CUTI SAKIT", "TIME-SLIP", "CUTI BERSALIN", "CUTI KECEMASAN", "CUTI TANPA REKOD KELOMPOK", "BENGKEL", "TAKLIMAT", "TUGAS RASMI"];
 const bulanMelayu = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
 
 const countWorkDays = (start, end) => {
@@ -228,14 +228,14 @@ export default function App() {
     if (type.includes("BERSALIN")) return 'BERSALIN';
     if (type.includes("SAKIT")) return 'SAKIT';
     if (type.includes("TIME-SLIP") || type.includes("TIME SLIP")) return 'TIMESLIP';
-    if (type.includes("REHAT KHAS") || type === "CRK" || type.includes("CUTI REHAT") || type.includes("KECEMASAN") || type.includes("CTR")) return 'CRK_CR';
-    return 'OTHER';
+    if (type.includes("REHAT KHAS") || type === "CRK" || type.includes("CUTI REHAT") || type.includes("KECEMASAN") || type.includes("CTR") || type.includes("TANPA REKOD")) return 'CRK_CR';
+    return 'RASMI';
   };
 
   const sjkcStats = useMemo(() => {
     const statsMap = {};
     sortedTeachers.forEach(t => {
-      statsMap[t] = { name: t, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
+      statsMap[t] = { name: t, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0 };
     });
 
     historyRecords.forEach(rec => {
@@ -249,7 +249,7 @@ export default function App() {
       const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0 };
+      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0 };
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
@@ -272,6 +272,7 @@ export default function App() {
         else if (category === 'SAKIT') statsMap[tName].cur_sakit += days;
         else if (category === 'TIMESLIP') statsMap[tName].cur_timeslip += 1;
         else if (category === 'BERSALIN') statsMap[tName].cur_bersalin += days;
+        else if (category === 'RASMI') statsMap[tName].cur_rasmi += days;
       }
     });
 
@@ -528,25 +529,26 @@ export default function App() {
               <table className="w-full min-w-[900px] border-collapse text-sm text-black border-2 border-black">
                 <thead>
                   <tr>
-                    <th colSpan="8" className="bg-[#fce5cd] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
+                    <th colSpan="9" className="bg-[#fce5cd] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
                       ANALISIS CUTI GURU DAN AKP SJKC CHUNG HWA KOTA KINABALU BAGI BULAN {bulanString} {statYear}
                     </th>
                   </tr>
                   <tr className="text-center font-black">
                     <th rowSpan="3" className="bg-[#ffe599] border-2 border-black w-12 px-2 py-2">NO</th>
                     <th rowSpan="3" className="bg-[#ffe599] border-2 border-black px-4 py-2 min-w-[200px]">NAMA GURU</th>
-                    <th colSpan="4" className="bg-[#f4cccc] border-2 border-black py-2">{bulanString} {statYear}</th>
+                    <th colSpan="5" className="bg-[#f4cccc] border-2 border-black py-2">{bulanString} {statYear}</th>
                     <th rowSpan="3" className="bg-[#9fc5e8] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI DARI<br/>BULAN<br/>SEBELUMNYA</th>
                     <th rowSpan="3" className="bg-[#00ffff] border-2 border-black px-3 py-2 w-32 leading-snug">JUMLAH CUTI AKHIR<br/>BULAN {bulanString}<br/>{statYear}</th>
                   </tr>
                   <tr className="text-center font-black">
-                    <th colSpan="4" className="bg-[#f4cccc] border-2 border-black py-1.5">JENIS CUTI</th>
+                    <th colSpan="5" className="bg-[#f4cccc] border-2 border-black py-1.5">JENIS CUTI</th>
                   </tr>
                   <tr className="text-center font-black text-xs leading-snug">
                     <th className="bg-[#f4cccc] border-2 border-black p-2 w-36">CRK/ CR/CUTI<br/>KECEMASAN/<br/>CTR (KELOMPOK)</th>
                     <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI SAKIT</th>
                     <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">TIME SLIP</th>
                     <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI BERSALIN</th>
+                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">公事<br/>(RASMI)</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
@@ -589,6 +591,15 @@ export default function App() {
                             isExporting ? <span className="text-purple-600">{row.cur_bersalin}</span> : 
                             <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'BERSALIN', monthFilter: 'cur' })} className="text-purple-600 hover:bg-purple-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
                               {row.cur_bersalin} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+
+                        <td className="border border-black text-center font-bold text-lg">
+                          {row.cur_rasmi > 0 ? (
+                            isExporting ? <span className="text-emerald-600">{row.cur_rasmi}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'cur' })} className="text-emerald-600 hover:bg-emerald-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
+                              {row.cur_rasmi} <MousePointerClick size={12} className="opacity-50"/>
                             </button>
                           ) : ""}
                         </td>
