@@ -270,10 +270,9 @@ export default function App() {
       const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) {
-         const baseNum = baselineCuti[tName] || 0;
-         statsMap[tName] = { name: tName, prev_cuti: baseNum, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
-      }
+      
+      // 💡 修复核心：如果老师已经被你从名单中删除（不在 statsMap 里），则直接忽略他的所有记录，绝不在统计表中复活！
+      if (!statsMap[tName]) return;
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
