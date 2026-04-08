@@ -236,7 +236,7 @@ export default function App() {
   const sjkcStats = useMemo(() => {
     const statsMap = {};
     sortedTeachers.forEach(t => {
-      statsMap[t] = { name: t, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0 };
+      statsMap[t] = { name: t, prev_cuti: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
     });
 
     historyRecords.forEach(rec => {
@@ -250,7 +250,7 @@ export default function App() {
       const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_crk_cr: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0 };
+      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_cuti: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
@@ -267,8 +267,11 @@ export default function App() {
 
       const category = getRecordCategory(rec.type);
 
-      if (recMonth < selMonth && category === 'CRK_CR') statsMap[tName].prev_crk_cr += days;
-      else if (recMonth === selMonth) {
+      if (recMonth < selMonth) {
+        if (category === 'RASMI') statsMap[tName].prev_rasmi += days;
+        else if (category === 'TIMESLIP') statsMap[tName].prev_cuti += 1;
+        else statsMap[tName].prev_cuti += days;
+      } else if (recMonth === selMonth) {
         if (category === 'CRK_CR') statsMap[tName].cur_crk_cr += days;
         else if (category === 'SAKIT') statsMap[tName].cur_sakit += days;
         else if (category === 'TIMESLIP') statsMap[tName].cur_timeslip += 1;
@@ -299,7 +302,11 @@ export default function App() {
       if (detailView.monthFilter === 'cur' && recMonth !== selMonth) return false;
       if (detailView.monthFilter === 'total' && recMonth > selMonth) return false;
 
-      return getRecordCategory(rec.type) === detailView.category;
+      const category = getRecordCategory(rec.type);
+      if (detailView.category === 'ALL_CUTI') {
+        return category !== 'RASMI';
+      }
+      return category === detailView.category;
     });
   }, [historyRecords, detailView, statYear, statMonth]);
 
@@ -548,39 +555,44 @@ export default function App() {
 
             {/* 用 ref 包裹需要导出成 PDF 的区域 */}
             <div ref={tableRef} className="bg-white p-2 sm:p-4 rounded-[32px] shadow-lg border border-slate-200 overflow-x-auto relative" style={{ backgroundColor: 'white' }}>
-              <table className="w-full min-w-[900px] border-collapse text-sm text-black border-2 border-black">
+              <table className="w-full min-w-[1000px] border-collapse text-sm text-black border-2 border-black">
                 <thead>
                   <tr>
-                    <th colSpan="9" className="bg-[#fce5cd] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
+                    <th colSpan="11" className="bg-[#ffff00] text-center py-3 border-2 border-black text-lg uppercase font-black tracking-wide">
                       ANALISIS CUTI GURU DAN AKP SJKC CHUNG HWA KOTA KINABALU BAGI BULAN {bulanString} {statYear}
                     </th>
                   </tr>
                   <tr className="text-center font-black">
-                    <th rowSpan="3" className="bg-[#ffe599] border-2 border-black w-12 px-2 py-2">NO</th>
-                    <th rowSpan="3" className="bg-[#ffe599] border-2 border-black px-4 py-2 min-w-[200px]">NAMA GURU</th>
-                    <th colSpan="5" className="bg-[#f4cccc] border-2 border-black py-2">{bulanString} {statYear}</th>
-                    <th rowSpan="3" className="bg-[#9fc5e8] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI DARI<br/>BULAN<br/>SEBELUMNYA</th>
-                    <th rowSpan="3" className="bg-[#00ffff] border-2 border-black px-3 py-2 w-32 leading-snug">JUMLAH CUTI AKHIR<br/>BULAN {bulanString}<br/>{statYear}</th>
+                    <th rowSpan="3" className="bg-[#f6b26b] border-2 border-black w-12 px-2 py-2">NO</th>
+                    <th rowSpan="3" className="bg-[#f6b26b] border-2 border-black px-4 py-2 min-w-[200px]">NAMA GURU</th>
+                    <th colSpan="6" className="bg-[#f6b26b] border-2 border-black py-2">{bulanString} {statYear}</th>
+                    <th colSpan="3" className="bg-[#d9ead3] border-2 border-black py-2">CUTI RASMI</th>
                   </tr>
                   <tr className="text-center font-black">
-                    <th colSpan="5" className="bg-[#f4cccc] border-2 border-black py-1.5">JENIS CUTI</th>
+                    <th colSpan="4" className="bg-[#bde5f8] border-2 border-black py-1.5">CUTI</th>
+                    <th rowSpan="2" className="bg-[#bde5f8] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI DARI<br/>BULAN<br/>SEBELUMNYA</th>
+                    <th rowSpan="2" className="bg-[#bde5f8] border-2 border-black px-3 py-2 w-32 leading-snug">JUMLAH CUTI AKHIR<br/>BULAN {bulanString} {statYear}</th>
+                    <th rowSpan="2" className="bg-[#d9ead3] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI RASMI</th>
+                    <th rowSpan="2" className="bg-[#d9ead3] border-2 border-black px-3 py-2 w-28 leading-snug">CUTI RASMI<br/>DARI BULAN<br/>SEBELUMNYA</th>
+                    <th rowSpan="2" className="bg-[#d9ead3] border-2 border-black px-3 py-2 w-32 leading-snug">JUMLAH CUTI RASMI<br/>AKHIR BULAN {bulanString} {statYear}</th>
                   </tr>
                   <tr className="text-center font-black text-xs leading-snug">
-                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-36">CRK/ CR/CUTI<br/>KECEMASAN/<br/>CTR (KELOMPOK)</th>
-                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI SAKIT</th>
-                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">TIME SLIP</th>
-                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">CUTI BERSALIN</th>
-                    <th className="bg-[#f4cccc] border-2 border-black p-2 w-24">公事<br/>(RASMI)</th>
+                    <th className="bg-[#bde5f8] border-2 border-black p-2 w-36">CRK/CR/CUTI<br/>KECEMASAN /<br/>CTR</th>
+                    <th className="bg-[#bde5f8] border-2 border-black p-2 w-24">CUTI SAKIT</th>
+                    <th className="bg-[#bde5f8] border-2 border-black p-2 w-24">TIME SLIP</th>
+                    <th className="bg-[#bde5f8] border-2 border-black p-2 w-24">CUTI BERSALIN</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
                   {filteredSjkcStats.map((row, index) => {
-                    const totalAkhir = row.prev_crk_cr + row.cur_crk_cr; 
+                    const totalCutiAkhir = row.prev_cuti + row.cur_crk_cr + row.cur_sakit + row.cur_timeslip + row.cur_bersalin; 
+                    const totalRasmiAkhir = row.prev_rasmi + row.cur_rasmi; 
                     return (
                       <tr key={row.name} className="hover:bg-slate-100 transition-colors">
                         <td className="border border-black text-center font-medium py-2">{index + 1}</td>
                         <td className="border border-black px-3 font-bold">{row.name}</td>
                         
+                        {/* 当月 CRK类 */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_crk_cr > 0 ? (
                             isExporting ? <span className="text-red-600">{row.cur_crk_cr}</span> : 
@@ -590,6 +602,7 @@ export default function App() {
                           ) : ""}
                         </td>
                         
+                        {/* 当月 SAKIT */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_sakit > 0 ? (
                             isExporting ? <span className="text-blue-600">{row.cur_sakit}</span> : 
@@ -599,6 +612,7 @@ export default function App() {
                           ) : ""}
                         </td>
                         
+                        {/* 当月 TIME SLIP */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_timeslip > 0 ? (
                             isExporting ? <span className="text-slate-600">{row.cur_timeslip}</span> : 
@@ -608,6 +622,7 @@ export default function App() {
                           ) : ""}
                         </td>
                         
+                        {/* 当月 BERSALIN */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_bersalin > 0 ? (
                             isExporting ? <span className="text-purple-600">{row.cur_bersalin}</span> : 
@@ -617,29 +632,52 @@ export default function App() {
                           ) : ""}
                         </td>
 
-                        <td className="border border-black text-center font-bold text-lg">
-                          {row.cur_rasmi > 0 ? (
-                            isExporting ? <span className="text-emerald-600">{row.cur_rasmi}</span> : 
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'cur' })} className="text-emerald-600 hover:bg-emerald-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer">
-                              {row.cur_rasmi} <MousePointerClick size={12} className="opacity-50"/>
-                            </button>
-                          ) : ""}
-                        </td>
-                        
-                        <td className="border border-black bg-[#f0f8ff] text-center font-black text-lg">
-                          {row.prev_crk_cr > 0 ? (
-                            isExporting ? <span className="text-blue-800">{row.prev_crk_cr}</span> : 
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
-                              {row.prev_crk_cr}
+                        {/* 私假 DARI BULAN SEBELUMNYA (排除RASMI) */}
+                        <td className="border border-black bg-[#bde5f8] text-center font-black text-lg">
+                          {row.prev_cuti > 0 ? (
+                            isExporting ? <span className="text-blue-800">{row.prev_cuti}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'ALL_CUTI', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {row.prev_cuti}
                             </button>
                           ) : ""}
                         </td>
 
-                        <td className="border border-black bg-[#e0ffff] text-center font-black text-xl text-teal-800">
-                          {totalAkhir > 0 ? (
-                            isExporting ? <span>{totalAkhir}</span> : 
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'CRK_CR', monthFilter: 'total' })} className="hover:bg-teal-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
-                              {totalAkhir}
+                        {/* 私假 JUMLAH CUTI AKHIR BULAN (排除RASMI) */}
+                        <td className="border border-black bg-[#bde5f8] text-center font-black text-xl text-teal-800">
+                          {totalCutiAkhir > 0 ? (
+                            isExporting ? <span>{totalCutiAkhir}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'ALL_CUTI', monthFilter: 'total' })} className="hover:bg-teal-100 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {totalCutiAkhir}
+                            </button>
+                          ) : ""}
+                        </td>
+
+                        {/* 当月 公事(RASMI) */}
+                        <td className="border border-black text-center font-bold text-lg bg-[#d9ead3]">
+                          {row.cur_rasmi > 0 ? (
+                            isExporting ? <span className="text-emerald-700">{row.cur_rasmi}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'cur' })} className="text-emerald-700 hover:bg-emerald-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {row.cur_rasmi} <MousePointerClick size={12} className="opacity-50"/>
+                            </button>
+                          ) : ""}
+                        </td>
+
+                        {/* CUTI RASMI DARI BULAN SEBELUMNYA */}
+                        <td className="border border-black bg-[#d9ead3] text-center font-black text-lg">
+                          {row.prev_rasmi > 0 ? (
+                            isExporting ? <span className="text-emerald-800">{row.prev_rasmi}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'prev' })} className="text-emerald-800 hover:bg-emerald-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {row.prev_rasmi}
+                            </button>
+                          ) : ""}
+                        </td>
+
+                        {/* JUMLAH CUTI RASMI AKHIR BULAN */}
+                        <td className="border border-black bg-[#d9ead3] text-center font-black text-xl text-green-900">
+                          {totalRasmiAkhir > 0 ? (
+                            isExporting ? <span>{totalRasmiAkhir}</span> : 
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'total' })} className="hover:bg-green-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                              {totalRasmiAkhir}
                             </button>
                           ) : ""}
                         </td>
