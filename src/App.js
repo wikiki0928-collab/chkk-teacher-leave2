@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive, MousePointerClick, Printer } from 'lucide-react';
+import { ClipboardCopy, CheckCircle2, User, CalendarDays, FileText, Info, Settings, Plus, Trash2, X, Cloud, Loader2, Clock, History, FileUp, Download, Image as ImageIcon, Briefcase, FileImage, BarChart3, AlertTriangle, Search, Archive, MousePointerClick, Printer, Database, ArrowRight } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -37,7 +37,7 @@ const countWorkDays = (start, end) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('leave'); 
-  const tableRef = useRef(null); // 用于截图/导出PDF的引用
+  const tableRef = useRef(null); 
 
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
@@ -52,6 +52,7 @@ export default function App() {
   const [teachersList, setTeachersList] = useState(rawTeachers);
   const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
   const [historyRecords, setHistoryRecords] = useState([]);
+  const [baselineCuti, setBaselineCuti] = useState({}); // 新增：用来存储1-3月的前期底数
   const [isSyncing, setIsSyncing] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showManager, setShowManager] = useState(null);
@@ -72,9 +73,14 @@ export default function App() {
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
   const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString());
   const [statSearch, setStatSearch] = useState("");
-  const [statSortMode, setStatSortMode] = useState("alphabet"); // 新增：排序模式 ('alphabet' | 'cuti_desc' | 'rasmi_desc')
+  const [statSortMode, setStatSortMode] = useState("alphabet"); 
   const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '', monthFilter: '' });
   const [isExporting, setIsExporting] = useState(false);
+
+  // 前期余额导入工具状态 (新增)
+  const [showBaselineModal, setShowBaselineModal] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [parsedBaseline, setParsedBaseline] = useState([]);
 
   // PDF 工具状态
   const [pdfImages, setPdfImages] = useState([]);
@@ -116,6 +122,12 @@ export default function App() {
       else setDoc(snap.ref, { list: rawLeaveTypes });
     });
 
+    const baselineRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'baseline_cuti');
+    const unsubBaseline = onSnapshot(baselineRef, (snap) => {
+      if (snap.exists()) setBaselineCuti(snap.data().data || {});
+      else setDoc(snap.ref, { data: {} });
+    });
+
     const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
     const unsubHistory = onSnapshot(qHistory, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -123,10 +135,10 @@ export default function App() {
       setHistoryRecords(sorted);
     });
 
-    return () => { unsubTeachers(); unsubLeaves(); unsubHistory(); };
+    return () => { unsubTeachers(); unsubLeaves(); unsubBaseline(); unsubHistory(); };
   }, [user]);
 
-  // 加载外部引擎 (PDF.js, JSZip, html2pdf)
+  // 加载外部引擎
   useEffect(() => {
     if (!window.pdfjsLib) {
       const script = document.createElement('script');
@@ -237,7 +249,14 @@ export default function App() {
   const sjkcStats = useMemo(() => {
     const statsMap = {};
     sortedTeachers.forEach(t => {
-      statsMap[t] = { name: t, prev_cuti: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
+      // 关键：在这里将 baselineCuti (前期底数) 直接赋予 prev_cuti，就像银行存款底数一样！
+      const baseNum = baselineCuti[t] || 0;
+      statsMap[t] = { 
+        name: t, 
+        prev_cuti: baseNum, // <-- 融入旧账底数
+        cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, 
+        cur_rasmi: 0, prev_rasmi: 0 // Rasmi 从0开始，不受底数影响
+      };
     });
 
     historyRecords.forEach(rec => {
@@ -251,7 +270,10 @@ export default function App() {
       const selMonth = parseInt(statMonth, 10);
 
       const tName = rec.teacher;
-      if (!statsMap[tName]) statsMap[tName] = { name: tName, prev_cuti: 0, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
+      if (!statsMap[tName]) {
+         const baseNum = baselineCuti[tName] || 0;
+         statsMap[tName] = { name: tName, prev_cuti: baseNum, cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, cur_rasmi: 0, prev_rasmi: 0 };
+      }
 
       let days = 1;
       const daysMatch = rec.dateInfo.match(/\((\d+)\s+HARI\)/i);
@@ -282,27 +304,23 @@ export default function App() {
     });
 
     return Object.values(statsMap).sort((a, b) => a.name.localeCompare(b.name));
-  }, [historyRecords, statYear, statMonth, sortedTeachers]);
+  }, [historyRecords, statYear, statMonth, sortedTeachers, baselineCuti]);
 
   const filteredSjkcStats = useMemo(() => {
     if (!statSearch) return sjkcStats;
     return sjkcStats.filter(t => t.name.toLowerCase().includes(statSearch.toLowerCase()));
   }, [sjkcStats, statSearch]);
 
-  // 新增：根据排序模式对数据进行排行榜排序
   const sortedAndFilteredStats = useMemo(() => {
     let result = [...filteredSjkcStats];
-    
     if (statSortMode === 'cuti_desc') {
-      // 按照 私假总数 (JUMLAH CUTI AKHIR BULAN) 从大到小排列
       result.sort((a, b) => {
         const totalA = a.prev_cuti + a.cur_crk_cr + a.cur_sakit + a.cur_timeslip + a.cur_bersalin;
         const totalB = b.prev_cuti + b.cur_crk_cr + b.cur_sakit + b.cur_timeslip + b.cur_bersalin;
-        if (totalB !== totalA) return totalB - totalA; // 数字大的排前面
-        return a.name.localeCompare(b.name); // 数字一样则按名字排
+        if (totalB !== totalA) return totalB - totalA; 
+        return a.name.localeCompare(b.name); 
       });
     } else if (statSortMode === 'rasmi_desc') {
-      // 按照 公事总数 (JUMLAH CUTI RASMI AKHIR BULAN) 从大到小排列
       result.sort((a, b) => {
         const rasmiA = a.prev_rasmi + a.cur_rasmi;
         const rasmiB = b.prev_rasmi + b.cur_rasmi;
@@ -310,7 +328,6 @@ export default function App() {
         return a.name.localeCompare(b.name);
       });
     }
-    // 如果是 'alphabet'，本身 filteredSjkcStats 已经是按字母排好的了，直接 return 即可
     return result;
   }, [filteredSjkcStats, statSortMode]);
 
@@ -329,21 +346,57 @@ export default function App() {
       if (detailView.monthFilter === 'total' && recMonth > selMonth) return false;
 
       const category = getRecordCategory(rec.type);
-      if (detailView.category === 'ALL_CUTI') {
-        return category !== 'RASMI';
-      }
+      if (detailView.category === 'ALL_CUTI') return category !== 'RASMI';
       return category === detailView.category;
     });
   }, [historyRecords, detailView, statYear, statMonth]);
 
-  // 导出 PDF 核心逻辑
+  // 解析 Excel 粘贴过来的文本
+  const handleParseImport = () => {
+    if (!importText.trim()) return showToast("⚠️ 请先粘贴 Excel 内容！");
+    const lines = importText.split('\n');
+    const parsed = [];
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      // 支持 Tab 制表符或者连续空格的分割
+      const parts = line.split(/\t+/);
+      if (parts.length >= 2) {
+        const name = parts[0].trim().toUpperCase();
+        const val = parseInt(parts[1].trim(), 10);
+        if (!isNaN(val)) {
+           parsed.push({ name, value: val, matched: sortedTeachers.includes(name) });
+        }
+      }
+    });
+    setParsedBaseline(parsed);
+  };
+
+  const saveBaseline = async () => {
+    if (!user) return showToast("❌ 请先连接云端！");
+    const newData = { ...baselineCuti };
+    let successCount = 0;
+    parsedBaseline.forEach(item => {
+       if (item.matched) {
+          newData[item.name] = item.value;
+          successCount++;
+       }
+    });
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'baseline_cuti'), { data: newData });
+      setShowBaselineModal(false);
+      setParsedBaseline([]);
+      setImportText("");
+      showToast(`✅ 成功导入 ${successCount} 位老师的前期数据！`);
+    } catch (e) {
+      showToast("❌ 导入失败，请检查网络！");
+    }
+  };
+
   const exportToPDF = () => {
     if (!window.html2pdf || !tableRef.current) return showToast("⏳ PDF导出引擎准备中...");
-    
     setIsExporting(true);
     showToast("⏳ 正在为您生成高清 PDF，请稍候...");
 
-    // 稍微延迟一下，让 React 渲染完“导出模式”的无按钮界面
     setTimeout(() => {
       const element = tableRef.current;
       const opt = {
@@ -351,7 +404,7 @@ export default function App() {
         filename:     `全校数据统计_${bulanMelayu[parseInt(statMonth) - 1]}_${statYear}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // 横向打印最适合这种宽表格
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } 
       };
 
       window.html2pdf().set(opt).from(element).save().then(() => {
@@ -395,19 +448,10 @@ export default function App() {
     if (file) processPdfFile(file);
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) processPdfFile(file);
   };
@@ -468,7 +512,7 @@ export default function App() {
           <div className="space-y-6 animate-in fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.5</span></h1>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">老师请假系统 <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">v3.9</span></h1>
                 <p className="text-slate-400 text-xs font-bold mt-1 flex items-center gap-2">
                     {user ? <span className="text-green-500 flex items-center gap-1"><Cloud size={12}/>云端同步正常</span> : <span className="text-red-400 flex items-center gap-1"><Cloud size={12}/>离线模式</span>}
                 </p>
@@ -544,7 +588,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: 全校数据统计 (导出PDF版) */}
+        {/* TAB 2: 全校数据统计 */}
         {activeTab === 'stats' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
             
@@ -555,7 +599,14 @@ export default function App() {
                
                <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto items-center flex-wrap justify-end">
                   
-                  {/* 下载 PDF 按钮 */}
+                  {/* 新增：导入前期底数 按钮 */}
+                  <button 
+                    onClick={() => setShowBaselineModal(true)}
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-black text-indigo-700 bg-indigo-100 hover:bg-indigo-200 active:scale-95 w-full sm:w-auto transition-all"
+                  >
+                    <Database size={18} /> 导入旧账底数
+                  </button>
+
                   <button 
                     onClick={exportToPDF}
                     disabled={isExporting}
@@ -565,7 +616,6 @@ export default function App() {
                     {isExporting ? '生成中...' : '下载报表 (PDF)'}
                   </button>
 
-                  {/* 排序模式选择器 (新增) */}
                   <select 
                     value={statSortMode} 
                     onChange={e => setStatSortMode(e.target.value)} 
@@ -592,7 +642,6 @@ export default function App() {
                </div>
             </div>
 
-            {/* 用 ref 包裹需要导出成 PDF 的区域 */}
             <div ref={tableRef} className="bg-white p-2 sm:p-4 rounded-[32px] shadow-lg border border-slate-200 overflow-x-auto relative" style={{ backgroundColor: 'white' }}>
               <table className="w-full min-w-[1000px] border-collapse text-sm text-black border-2 border-black">
                 <thead>
@@ -623,8 +672,8 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="bg-white">
-                  {/* 这里改用 sortedAndFilteredStats */}
                   {sortedAndFilteredStats.map((row, index) => {
+                    // 注意：这边的 row.prev_cuti 已经包含了我们在新功能里导入的 baseline 底数！
                     const totalCutiAkhir = row.prev_cuti + row.cur_crk_cr + row.cur_sakit + row.cur_timeslip + row.cur_bersalin; 
                     const totalRasmiAkhir = row.prev_rasmi + row.cur_rasmi; 
                     return (
@@ -632,7 +681,6 @@ export default function App() {
                         <td className="border border-black text-center font-medium py-2">{index + 1}</td>
                         <td className="border border-black px-3 font-bold">{row.name}</td>
                         
-                        {/* 当月 CRK类 */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_crk_cr > 0 ? (
                             isExporting ? <span className="text-red-600">{row.cur_crk_cr}</span> : 
@@ -642,7 +690,6 @@ export default function App() {
                           ) : ""}
                         </td>
                         
-                        {/* 当月 SAKIT */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_sakit > 0 ? (
                             isExporting ? <span className="text-blue-600">{row.cur_sakit}</span> : 
@@ -652,7 +699,6 @@ export default function App() {
                           ) : ""}
                         </td>
                         
-                        {/* 当月 TIME SLIP */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_timeslip > 0 ? (
                             isExporting ? <span className="text-slate-600">{row.cur_timeslip}</span> : 
@@ -662,7 +708,6 @@ export default function App() {
                           ) : ""}
                         </td>
                         
-                        {/* 当月 BERSALIN */}
                         <td className="border border-black text-center font-bold text-lg">
                           {row.cur_bersalin > 0 ? (
                             isExporting ? <span className="text-purple-600">{row.cur_bersalin}</span> : 
@@ -672,17 +717,17 @@ export default function App() {
                           ) : ""}
                         </td>
 
-                        {/* 私假 DARI BULAN SEBELUMNYA (排除RASMI) */}
                         <td className="border border-black bg-[#bde5f8] text-center font-black text-lg">
                           {row.prev_cuti > 0 ? (
                             isExporting ? <span className="text-blue-800">{row.prev_cuti}</span> : 
-                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'ALL_CUTI', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full">
+                            <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'ALL_CUTI', monthFilter: 'prev' })} className="text-blue-800 hover:bg-blue-200 px-2 py-0.5 rounded transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer w-full h-full relative group">
                               {row.prev_cuti}
+                              {/* 如果有旧账底数，Hover时会有小提示 */}
+                              {baselineCuti[row.name] > 0 && <span className="absolute -top-6 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">含Excel导入底数: {baselineCuti[row.name]}</span>}
                             </button>
                           ) : ""}
                         </td>
 
-                        {/* 私假 JUMLAH CUTI AKHIR BULAN (排除RASMI) */}
                         <td className="border border-black bg-[#bde5f8] text-center font-black text-xl text-teal-800">
                           {totalCutiAkhir > 0 ? (
                             isExporting ? <span>{totalCutiAkhir}</span> : 
@@ -692,7 +737,6 @@ export default function App() {
                           ) : ""}
                         </td>
 
-                        {/* 当月 公事(RASMI) */}
                         <td className="border border-black text-center font-bold text-lg bg-[#d9ead3]">
                           {row.cur_rasmi > 0 ? (
                             isExporting ? <span className="text-emerald-700">{row.cur_rasmi}</span> : 
@@ -702,7 +746,6 @@ export default function App() {
                           ) : ""}
                         </td>
 
-                        {/* CUTI RASMI DARI BULAN SEBELUMNYA */}
                         <td className="border border-black bg-[#d9ead3] text-center font-black text-lg">
                           {row.prev_rasmi > 0 ? (
                             isExporting ? <span className="text-emerald-800">{row.prev_rasmi}</span> : 
@@ -712,7 +755,6 @@ export default function App() {
                           ) : ""}
                         </td>
 
-                        {/* JUMLAH CUTI RASMI AKHIR BULAN */}
                         <td className="border border-black bg-[#d9ead3] text-center font-black text-xl text-green-900">
                           {totalRasmiAkhir > 0 ? (
                             isExporting ? <span>{totalRasmiAkhir}</span> : 
@@ -731,9 +773,6 @@ export default function App() {
                   <p className="text-slate-500 font-black text-lg">没有找到该老师的数据</p>
                 </div>
               )}
-            </div>
-            <div className="text-center text-xs font-bold text-slate-400 mt-2">
-              💡 提示：点击“下载报表(PDF)”即可获取完美适配 A4 纸比例的高清档案，可直接发群组或打印。
             </div>
           </div>
         )}
@@ -791,6 +830,67 @@ export default function App() {
           </div>
         )}
 
+        {/* Modal: 导入前期底数 (Excel Paste) */}
+        {showBaselineModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in">
+            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border-4 border-indigo-100">
+              
+              <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-black text-2xl flex items-center gap-2 text-indigo-900"><Database className="text-indigo-600" size={24}/> 导入前期旧账底数 (Excel)</h3>
+                  <p className="text-sm font-bold text-indigo-600 mt-1">直接从 Excel 复制【老师名字】和【1-3月假期总数】两列，粘贴到下方即可。</p>
+                </div>
+                <button onClick={() => { setShowBaselineModal(false); setParsedBaseline([]); setImportText(""); }} className="p-3 bg-white rounded-full hover:bg-indigo-200 hover:text-indigo-700 transition-all shadow-sm"><X size={24}/></button>
+              </div>
+
+              <div className="flex-grow overflow-y-auto p-6 bg-slate-50 flex flex-col md:flex-row gap-6">
+                
+                {/* 左边：输入框 */}
+                <div className="flex-1 flex flex-col gap-3">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">请在此处粘贴 (Ctrl + V)</label>
+                  <textarea 
+                    value={importText} 
+                    onChange={(e) => setImportText(e.target.value)}
+                    placeholder="WONG CHUN LIN&#9;15&#10;TEO AH BAN&#9;8&#10;HO CHIN FONG&#9;3..."
+                    className="w-full flex-grow min-h-[200px] p-4 bg-white border-2 border-indigo-100 rounded-2xl font-mono text-sm outline-none focus:border-indigo-400 resize-none shadow-inner"
+                  />
+                  <button onClick={handleParseImport} className="py-3.5 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 shadow-md active:scale-95 flex items-center justify-center gap-2 transition-all">
+                    解析数据 <ArrowRight size={18}/>
+                  </button>
+                </div>
+
+                {/* 右边：解析结果预览 */}
+                <div className="flex-1 flex flex-col gap-3 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="p-4 bg-slate-100 border-b font-black text-sm text-slate-700 flex justify-between items-center">
+                    <span>解析结果预览</span>
+                    <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md text-xs">成功识别: {parsedBaseline.filter(p => p.matched).length} 人</span>
+                  </div>
+                  <div className="flex-grow overflow-y-auto p-4 space-y-2 max-h-[300px]">
+                    {parsedBaseline.length === 0 ? (
+                      <div className="text-center text-slate-300 font-bold py-10">等待解析...</div>
+                    ) : (
+                      parsedBaseline.map((item, i) => (
+                        <div key={i} className={`flex justify-between items-center p-3 rounded-xl border ${item.matched ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                          <span className={`font-bold ${item.matched ? 'text-slate-700' : 'text-red-500 line-through'}`}>{item.name}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-black text-lg">{item.value} 天</span>
+                            {item.matched ? <CheckCircle2 className="text-green-500" size={18}/> : <AlertTriangle className="text-red-500" size={18} title="系统中找不到该名字"/>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t">
+                    <button onClick={saveBaseline} disabled={parsedBaseline.filter(p=>p.matched).length === 0} className="w-full py-3.5 bg-green-500 text-white rounded-xl font-black hover:bg-green-600 disabled:opacity-50 shadow-md active:scale-95 transition-all">
+                      确认保存到云端
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal: 穿透数据明细窗口 */}
         {detailView.isOpen && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[55] p-4 animate-in fade-in">
@@ -809,6 +909,18 @@ export default function App() {
                 <button onClick={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} className="p-3 bg-white rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition-all shadow-sm"><X size={24}/></button>
               </div>
               <div className="flex-grow overflow-y-auto p-6 space-y-4 bg-slate-50">
+                
+                {/* 重点：如果查看的是“之前的累积”或“全年总计”，并且该老师有导入的底数，在这里显示一个横幅提醒 */}
+                {(detailView.monthFilter === 'prev' || detailView.monthFilter === 'total') && baselineCuti[detailView.teacher] > 0 && detailView.category === 'ALL_CUTI' && (
+                  <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-xl flex items-start gap-3 shadow-sm mb-4">
+                    <Database className="text-orange-500 mt-0.5" size={20}/>
+                    <div>
+                      <p className="font-black text-orange-800">包含前期导入底数: {baselineCuti[detailView.teacher]} 天</p>
+                      <p className="text-xs text-orange-600 font-bold mt-1">系统已将您用 Excel 导入的前期假期，加算至当前总额中。下方的清单仅显示系统启用后新增的记录。</p>
+                    </div>
+                  </div>
+                )}
+
                 {detailRecords.map((rec) => (
                   <div key={rec.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group relative flex items-center justify-between">
                     <div className="space-y-1 pr-10">
@@ -821,7 +933,7 @@ export default function App() {
                     </button>
                   </div>
                 ))}
-                {detailRecords.length === 0 && <div className="py-10 text-center text-slate-300 font-black">记录已被清空</div>}
+                {detailRecords.length === 0 && <div className="py-10 text-center text-slate-300 font-black">没有系统内新增的记录</div>}
               </div>
             </div>
           </div>
