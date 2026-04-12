@@ -242,16 +242,28 @@ const StatsTab = ({
                       )}
                     </td>
 
-                    <td className="border border-slate-400 text-center font-black text-lg text-emerald-600">
-                      {row.cur_rasmi > 0 ? row.cur_rasmi : ""}
+                    <td className="border border-slate-400 text-center font-black text-lg">
+                      {row.cur_rasmi > 0 && (
+                        <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'cur' })} className="w-full h-full text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors">
+                          {row.cur_rasmi}
+                        </button>
+                      )}
                     </td>
 
                     <td className="border border-slate-400 bg-emerald-50/30 text-center font-bold text-sm text-emerald-800 opacity-60">
-                      {row.prev_rasmi > 0 ? row.prev_rasmi : "-"}
+                      {row.prev_rasmi > 0 ? (
+                        <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'prev' })} className="w-full h-full hover:bg-emerald-100 flex items-center justify-center transition-colors">
+                          {row.prev_rasmi}
+                        </button>
+                      ) : "-"}
                     </td>
 
                     <td className="border-2 border-slate-900 bg-emerald-50 text-center font-black text-xl text-emerald-800">
-                      {totalRasmiAkhir > 0 ? totalRasmiAkhir : ""}
+                      {totalRasmiAkhir > 0 && (
+                        <button onClick={() => setDetailView({ isOpen: true, teacher: row.name, category: 'RASMI', monthFilter: 'total' })} className="w-full h-full hover:bg-emerald-100 flex items-center justify-center transition-colors">
+                          {totalRasmiAkhir}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
