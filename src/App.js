@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Briefcase, BarChart3, FileImage } from 'lucide-react';
-import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { Briefcase, BarChart3, FileImage, ClipboardCheck, Clipboard } from 'lucide-react';
 
-import { auth, db, appId } from './lib/firebase';
-import { rawTeachers, rawLeaveTypes, bulanMelayu } from './constants/data';
+import { useFirebaseData } from './hooks/useFirebaseData';
+import { usePdfConverter } from './hooks/usePdfConverter';
+
+import { bulanMelayu } from './constants/data';
 import { countWorkDays, formatTimeTo12h, getRecordCategory } from './utils/helpers';
 
 import LeaveSystemTab from './components/LeaveSystemTab';
@@ -17,9 +17,12 @@ import BaselineModal from './components/BaselineModal';
 import DetailViewModal from './components/DetailViewModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 
+import { doc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db, appId } from './lib/firebase';
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('leave'); 
-  const tableRef = useRef(null); 
+  const [activeTab, setActiveTab] = useState('leave');
+  const tableRef = useRef(null);
 
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
@@ -29,15 +32,29 @@ export default function App() {
     setTimeout(() => setToastMsg(""), 3000);
   };
 
-  const [user, setUser] = useState(null);
-  const [teachersList, setTeachersList] = useState(rawTeachers);
-  const [leaveTypesList, setLeaveTypesList] = useState(rawLeaveTypes);
-  const [historyRecords, setHistoryRecords] = useState([]);
-  const [baselineCuti, setBaselineCuti] = useState({});
-  const [isSyncing, setIsSyncing] = useState(true);
+  // Custom Hooks
+  const {
+    user,
+    teachersList,
+    leaveTypesList,
+    historyRecords,
+    baselineCuti,
+    isSyncing,
+    updateConfigList,
+    saveBaselineData
+  } = useFirebaseData(showToast);
+
+  const {
+    pdfImages,
+    isConverting,
+    isZipping,
+    processPdfFile,
+    downloadAllAsZip
+  } = usePdfConverter(showToast);
+
+  // Local UI State
   const [showHistory, setShowHistory] = useState(false);
   const [showManager, setShowManager] = useState(null);
-
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [leaveType, setLeaveType] = useState("");
   const [customLeaveType, setCustomLeaveType] = useState("");
@@ -53,7 +70,7 @@ export default function App() {
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
   const [statMonth, setStatMonth] = useState((currentJsMonth + 1).toString());
   const [statSearch, setStatSearch] = useState("");
-  const [statSortMode, setStatSortMode] = useState("alphabet"); 
+  const [statSortMode, setStatSortMode] = useState("alphabet");
   const [detailView, setDetailView] = useState({ isOpen: false, teacher: '', category: '', monthFilter: '' });
   const [isExporting, setIsExporting] = useState(false);
 
@@ -61,88 +78,10 @@ export default function App() {
   const [importText, setImportText] = useState("");
   const [parsedBaseline, setParsedBaseline] = useState([]);
 
-  const [pdfImages, setPdfImages] = useState([]);
-  const [isConverting, setIsConverting] = useState(false);
-  const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
-  const [isZipping, setIsZipping] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-          await signInWithCustomToken(auth, window.__initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (e) { 
-        setIsSyncing(false); 
-      }
-    };
-    initAuth();
-    const unsubAuth = onAuthStateChanged(auth, setUser);
-    return () => unsubAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!user) return; 
-    setIsSyncing(true);
-
-    const teachersRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'teachers_list');
-    const unsubTeachers = onSnapshot(teachersRef, (snap) => {
-      if (snap.exists()) setTeachersList(snap.data().list || []);
-      else setDoc(snap.ref, { list: rawTeachers });
-      setIsSyncing(false);
-    });
-
-    const leavesRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'leave_types');
-    const unsubLeaves = onSnapshot(leavesRef, (snap) => {
-      if (snap.exists()) setLeaveTypesList(snap.data().list || []);
-      else setDoc(snap.ref, { list: rawLeaveTypes });
-    });
-
-    const baselineRef = doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'baseline_cuti');
-    const unsubBaseline = onSnapshot(baselineRef, (snap) => {
-      if (snap.exists()) setBaselineCuti(snap.data().data || {});
-      else setDoc(snap.ref, { data: {} });
-    });
-
-    const qHistory = collection(db, 'artifacts', appId, 'public', 'data', 'leave_history');
-    const unsubHistory = onSnapshot(qHistory, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const sorted = docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setHistoryRecords(sorted);
-    });
-
-    return () => { unsubTeachers(); unsubLeaves(); unsubBaseline(); unsubHistory(); };
-  }, [user]);
-
-  useEffect(() => {
-    if (!window.pdfjsLib) {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-      script.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        setPdfjsLoaded(true);
-      };
-      document.body.appendChild(script);
-    } else { setPdfjsLoaded(true); }
-
-    if (!window.JSZip) {
-      const scriptZip = document.createElement('script');
-      scriptZip.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-      document.body.appendChild(scriptZip);
-    }
-
-    if (!window.html2pdf) {
-      const scriptPdf = document.createElement('script');
-      scriptPdf.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      document.body.appendChild(scriptPdf);
-    }
-  }, []);
-
   const sortedTeachers = useMemo(() => [...teachersList].sort((a, b) => a.localeCompare(b)), [teachersList]);
-  
+
   useEffect(() => {
     if (sortedTeachers.length > 0 && !selectedTeacher) setSelectedTeacher(sortedTeachers[0]);
     if (leaveTypesList.length > 0 && !leaveType) setLeaveType(leaveTypesList[0]);
@@ -163,24 +102,26 @@ export default function App() {
   const finalMessage = `**${selectedTeacher}**\n${leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType}\n${getDateLine()}`;
 
   const copyAndSave = async () => {
-    const el = document.createElement('textarea');
-    el.value = finalMessage;
-    document.body.appendChild(el); el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-    setCopiedStatus(true);
-    setTimeout(() => setCopiedStatus(false), 2000);
-
-    if (!user) { showToast("离线模式：未能存档到云端！"); return; }
     try {
+      await navigator.clipboard.writeText(finalMessage);
+      setCopiedStatus(true);
+      setTimeout(() => setCopiedStatus(false), 2000);
+
+      if (!user) {
+        showToast("离线模式：未能存档到云端！");
+        return;
+      }
+      
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leave_history'), {
         teacher: selectedTeacher,
         type: leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType,
         dateInfo: getDateLine(),
         createdAt: serverTimestamp()
       });
-      showToast("✅ 已存入历史记录！");
-    } catch (e) { showToast("❌ 存档失败，请检查网络！"); }
+      showToast("✅ 已存入历史记录并开启云端副本");
+    } catch (e) {
+      showToast("❌ 存档或复制失败");
+    }
   };
 
   const confirmDeleteRecord = async () => {
@@ -191,13 +132,11 @@ export default function App() {
       if (detailView.isOpen && detailRecords.length <= 1) {
         setDetailView({ ...detailView, isOpen: false });
       }
-    } catch(e) { showToast("❌ 删除失败"); } 
-    finally { setRecordToDelete(null); }
-  };
-
-  const updateList = (col, newList) => {
-    if(!user) return showToast("❌ 请先连接云端！");
-    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', col), { list: newList });
+    } catch (e) {
+      showToast("❌ 删除失败");
+    } finally {
+      setRecordToDelete(null);
+    }
   };
 
   const availableYears = useMemo(() => {
@@ -213,24 +152,23 @@ export default function App() {
     const statsMap = {};
     sortedTeachers.forEach(t => {
       const baseNum = baselineCuti[t] || 0;
-      statsMap[t] = { 
-        name: t, 
-        prev_cuti: baseNum, 
-        cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0, 
-        cur_rasmi: 0, prev_rasmi: 0 
+      statsMap[t] = {
+        name: t,
+        prev_cuti: baseNum,
+        cur_crk_cr: 0, cur_sakit: 0, cur_timeslip: 0, cur_bersalin: 0,
+        cur_rasmi: 0, prev_rasmi: 0
       };
     });
 
     historyRecords.forEach(rec => {
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-      if (!dateMatch) return; 
-      
+      if (!dateMatch) return;
+
       const recYear = dateMatch[3];
-      if (recYear !== statYear) return; 
+      if (recYear !== statYear) return;
 
       const recMonth = parseInt(dateMatch[2], 10);
       const selMonth = parseInt(statMonth, 10);
-
       const tName = rec.teacher;
       if (!statsMap[tName]) return;
 
@@ -276,8 +214,8 @@ export default function App() {
       result.sort((a, b) => {
         const totalA = a.prev_cuti + a.cur_crk_cr + a.cur_sakit + a.cur_timeslip + a.cur_bersalin;
         const totalB = b.prev_cuti + b.cur_crk_cr + b.cur_sakit + b.cur_timeslip + b.cur_bersalin;
-        if (totalB !== totalA) return totalB - totalA; 
-        return a.name.localeCompare(b.name); 
+        if (totalB !== totalA) return totalB - totalA;
+        return a.name.localeCompare(b.name);
       });
     } else if (statSortMode === 'rasmi_desc') {
       result.sort((a, b) => {
@@ -296,14 +234,11 @@ export default function App() {
       if (rec.teacher !== detailView.teacher) return false;
       const dateMatch = rec.dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})/);
       if (!dateMatch || dateMatch[3] !== statYear) return false;
-      
       const recMonth = parseInt(dateMatch[2], 10);
       const selMonth = parseInt(statMonth, 10);
-      
       if (detailView.monthFilter === 'prev' && recMonth >= selMonth) return false;
       if (detailView.monthFilter === 'cur' && recMonth !== selMonth) return false;
       if (detailView.monthFilter === 'total' && recMonth > selMonth) return false;
-
       const category = getRecordCategory(rec.type);
       if (detailView.category === 'ALL_CUTI') return category !== 'RASMI';
       return category === detailView.category;
@@ -321,146 +256,84 @@ export default function App() {
         const name = parts[0].trim().toUpperCase();
         const val = parseInt(parts[1].trim(), 10);
         if (!isNaN(val)) {
-           parsed.push({ name, value: val, matched: sortedTeachers.includes(name) });
+          parsed.push({ name, value: val, matched: sortedTeachers.includes(name) });
         }
       }
     });
     setParsedBaseline(parsed);
   };
 
-  const saveBaseline = async () => {
-    if (!user) return showToast("❌ 请先连接云端！");
+  const handleSaveBaseline = async () => {
     const newData = { ...baselineCuti };
-    let successCount = 0;
-    parsedBaseline.forEach(item => {
-       if (item.matched) {
-          newData[item.name] = item.value;
-          successCount++;
-       }
-    });
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'app_config', 'baseline_cuti'), { data: newData });
+    let sc = 0;
+    parsedBaseline.forEach(it => { if (it.matched) { newData[it.name] = it.value; sc++; } });
+    const ok = await saveBaselineData(newData);
+    if (ok) {
       setShowBaselineModal(false);
       setParsedBaseline([]);
       setImportText("");
-      showToast(`✅ 成功导入 ${successCount} 位老师的前期数据！`);
-    } catch (e) {
-      showToast("❌ 导入失败，请检查网络！");
+      showToast(`✅ 成功导入 ${sc} 位老师的数据！`);
+    } else {
+      showToast("❌ 导入失败，请重试");
     }
   };
 
   const exportToPDF = () => {
     if (!window.html2pdf || !tableRef.current) return showToast("⏳ PDF导出引擎准备中...");
     setIsExporting(true);
-    showToast("⏳ 正在为您生成高清 PDF，请稍候...");
-
+    showToast("⏳ 正在生成报表...");
     setTimeout(() => {
       const element = tableRef.current;
       const opt = {
-        margin:       10,
-        filename:     `全校数据统计_${bulanMelayu[parseInt(statMonth) - 1]}_${statYear}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+        margin: 10,
+        filename: `Leave_Stats_${bulanMelayu[parseInt(statMonth) - 1]}_${statYear}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
-
       window.html2pdf().set(opt).from(element).save().then(() => {
         setIsExporting(false);
-        showToast("✅ PDF 报表已成功下载！");
-      }).catch(err => {
-        console.error(err);
+        showToast("✅ PDF 下载完成");
+      }).catch(() => {
         setIsExporting(false);
-        showToast("❌ 导出失败，请重试");
+        showToast("❌ 导出失败");
       });
     }, 300);
-  };
-
-  const processPdfFile = async (file) => {
-    if (file.type !== 'application/pdf') return showToast("❌ 请上传有效的 PDF 文件！");
-    if (!pdfjsLoaded) return showToast('⏳ 引擎准备中...');
-    setIsConverting(true); setPdfImages([]);
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const typedarray = new Uint8Array(event.target.result);
-        const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
-        const images = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 }); 
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height; canvas.width = viewport.width;
-          await page.render({ canvasContext: context, viewport: viewport }).promise;
-          images.push(canvas.toDataURL('image/jpeg', 0.95)); 
-        }
-        setPdfImages(images); setIsConverting(false); showToast(`✅ 成功转换 ${pdf.numPages} 页！`);
-      };
-      reader.readAsArrayBuffer(file);
-    } catch (error) { setIsConverting(false); showToast("❌ 转换失败。"); }
-  };
-
-  const handlePdfUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) processPdfFile(file);
-  };
-
-  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
-  const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
-  const handleDrop = (e) => {
-    e.preventDefault(); setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) processPdfFile(file);
-  };
-
-  const downloadImage = (dataUrl, index) => {
-    const link = document.createElement('a'); link.href = dataUrl;
-    link.download = `公函_第${index + 1}页.jpg`;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  };
-
-  const downloadAllAsZip = async () => {
-    if (!window.JSZip) return showToast("⏳ 加载中...");
-    setIsZipping(true);
-    try {
-      const zip = new window.JSZip();
-      pdfImages.forEach((dataUrl, index) => {
-        const base64Data = dataUrl.split(',')[1];
-        zip.file(`公函_第${index + 1}页.jpg`, base64Data, { base64: true });
-      });
-      const content = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(content);
-      link.download = `公函包_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-      showToast("✅ 全部打包下载完成！");
-    } catch (error) { showToast("❌ 打包失败"); } 
-    finally { setIsZipping(false); }
   };
 
   const bulanString = bulanMelayu[parseInt(statMonth) - 1];
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4 font-sans text-slate-900 relative">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-sm animate-in slide-in-from-top-4 fade-in">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur text-white px-8 py-4 rounded-2xl shadow-2xl font-bold text-sm animate-fade-in border border-white/10">
           {toastMsg}
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-slate-900 rounded-[32px] p-2 flex gap-2 shadow-xl overflow-x-auto no-scrollbar">
-          <button onClick={() => setActiveTab('leave')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-            <Briefcase size={18}/> 请假系统
-          </button>
-          <button onClick={() => setActiveTab('stats')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-            <BarChart3 size={18}/> 全校数据统计
-          </button>
-          <button onClick={() => setActiveTab('pdf')} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-3xl font-black text-sm md:text-base transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-            <FileImage size={18}/> PDF转JPG
-          </button>
+      {/* Header Area */}
+      <div className="bg-slate-900 text-white pt-10 pb-20 px-4">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight mb-2">老师请假管理系统 <span className="text-blue-500">v2.0</span></h1>
+            <p className="text-slate-400 font-medium">官方高清字体渲染 · 云端数据实时同步</p>
+          </div>
+          
+          <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('leave')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+              <Briefcase size={16}/> 请假登记
+            </button>
+            <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+              <BarChart3 size={16}/> 数据统计
+            </button>
+            <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+              <FileImage size={16}/> PDF转换
+            </button>
+          </div>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto -mt-10 px-4 space-y-8 animate-fade-in">
         {activeTab === 'leave' && (
           <LeaveSystemTab 
             user={user}
@@ -519,60 +392,24 @@ export default function App() {
         {activeTab === 'pdf' && (
           <PdfToolTab 
             isDragging={isDragging}
-            handleDragOver={handleDragOver}
-            handleDragLeave={handleDragLeave}
-            handleDrop={handleDrop}
+            handleDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            handleDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+            handleDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if(f) processPdfFile(f); }}
             isConverting={isConverting}
-            handlePdfUpload={handlePdfUpload}
+            handlePdfUpload={(e) => { const f = e.target.files[0]; if(f) processPdfFile(f); }}
             pdfImages={pdfImages}
             downloadAllAsZip={downloadAllAsZip}
             isZipping={isZipping}
-            downloadImage={downloadImage}
+            downloadImage={(url, idx) => { const a = document.createElement('a'); a.href = url; a.download = `Page_${idx+1}.jpg`; a.click(); }}
           />
         )}
       </div>
 
-      <HistoryModal 
-        isOpen={showHistory}
-        onClose={() => setShowHistory(false)}
-        historyRecords={historyRecords}
-        setRecordToDelete={setRecordToDelete}
-      />
-
-      <ManagerModal 
-        showManager={showManager}
-        onClose={() => setShowManager(null)}
-        teachersList={teachersList}
-        sortedTeachers={sortedTeachers}
-        leaveTypesList={leaveTypesList}
-        updateList={updateList}
-      />
-
-      <BaselineModal 
-        showBaselineModal={showBaselineModal}
-        onClose={() => setShowBaselineModal(false)}
-        importText={importText}
-        setImportText={setImportText}
-        handleParseImport={handleParseImport}
-        parsedBaseline={parsedBaseline}
-        saveBaseline={saveBaseline}
-      />
-
-      <DetailViewModal 
-        detailView={detailView}
-        onClose={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })}
-        baselineCuti={baselineCuti}
-        detailRecords={detailRecords}
-        setRecordToDelete={setRecordToDelete}
-        bulanString={bulanString}
-        statYear={statYear}
-      />
-
-      <DeleteConfirmModal 
-        recordToDelete={recordToDelete}
-        onClose={() => setRecordToDelete(null)}
-        onConfirm={confirmDeleteRecord}
-      />
+      <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} />
+      <ManagerModal showManager={showManager} onClose={() => setShowManager(null)} teachersList={teachersList} sortedTeachers={sortedTeachers} leaveTypesList={leaveTypesList} updateList={updateConfigList} />
+      <BaselineModal showBaselineModal={showBaselineModal} onClose={() => setShowBaselineModal(false)} importText={importText} setImportText={setImportText} handleParseImport={handleParseImport} parsedBaseline={parsedBaseline} saveBaseline={handleSaveBaseline} />
+      <DetailViewModal detailView={detailView} onClose={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} baselineCuti={baselineCuti} detailRecords={detailRecords} setRecordToDelete={setRecordToDelete} bulanString={bulanString} statYear={statYear} />
+      <DeleteConfirmModal recordToDelete={recordToDelete} onClose={() => setRecordToDelete(null)} onConfirm={confirmDeleteRecord} />
     </div>
   );
 }

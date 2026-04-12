@@ -2,7 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-.App {
-  font-family: sans-serif;
-  text-align: center;
+@layer base {
+  :root {
+    --primary: 221 83% 53%; /* Royal Blue */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 222 47% 11%; /* Deep Navy */
+    --background: 210 40% 98%;
+    --accent: 262 83% 58%; /* Purple accent */
+  }
+
+  body {
+    @apply antialiased bg-slate-50 text-slate-900;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
 }
