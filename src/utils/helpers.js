@@ -26,3 +26,25 @@ export const getRecordCategory = (typeString) => {
   if (type.includes("REHAT KHAS") || type === "CRK" || type.includes("CUTI REHAT") || type.includes("KECEMASAN") || type.includes("CTR") || type.includes("TANPA REKOD")) return 'CRK_CR';
   return 'RASMI';
 };
+
+export const isDateInRange = (targetDateYMD, dateInfo) => {
+  // dateInfo formats: "DD.MM.YYYY" or "DD.MM.YYYY - DD.MM.YYYY"
+  const rangeMatch = dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})(?:\s*-\s*(\d{2})\.(\d{2})\.(\d{4}))?/);
+  if (!rangeMatch) return false;
+
+  const target = new Date(targetDateYMD);
+  target.setHours(0, 0, 0, 0);
+
+  const sD = new Date(`${rangeMatch[3]}-${rangeMatch[2]}-${rangeMatch[1]}`);
+  sD.setHours(0, 0, 0, 0);
+
+  let eD;
+  if (rangeMatch[4]) {
+    eD = new Date(`${rangeMatch[6]}-${rangeMatch[5]}-${rangeMatch[4]}`);
+  } else {
+    eD = new Date(sD);
+  }
+  eD.setHours(0, 0, 0, 0);
+
+  return target >= sD && target <= eD;
+};

@@ -386,6 +386,7 @@ export default function App() {
             setDetailView={setDetailView}
             baselineCuti={baselineCuti}
             filteredSjkcStats={filteredSjkcStats}
+            historyRecords={historyRecords}
           />
         )}
 
