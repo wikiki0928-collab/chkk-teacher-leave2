@@ -1,5 +1,6 @@
-import React from 'react';
-import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X } from 'lucide-react';
+import { isDateInRange } from '../utils/helpers';
 
 const StatsTab = ({
   setShowBaselineModal,
@@ -20,8 +21,16 @@ const StatsTab = ({
   sortedAndFilteredStats,
   setDetailView,
   baselineCuti,
-  filteredSjkcStats
+  filteredSjkcStats,
+  historyRecords
 }) => {
+  const [dailySearchDate, setDailySearchDate] = useState("");
+
+  const dailyLeaves = useMemo(() => {
+    if (!dailySearchDate) return [];
+    return historyRecords.filter(rec => isDateInRange(dailySearchDate, rec.dateInfo));
+  }, [dailySearchDate, historyRecords]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Control Bar */}
@@ -88,6 +97,62 @@ const StatsTab = ({
               </button>
             </div>
          </div>
+      </div>
+
+      {/* Daily Check Section */}
+      <div className="bg-white rounded-[32px] shadow-sm border border-slate-200 p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-orange-100 text-orange-600 rounded-2xl">
+               <UserCheck size={24}/>
+            </div>
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">每日考勤快查</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Quick Daily Leave Inspector</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100 w-full md:w-auto">
+            <Calendar size={18} className="ml-2 text-slate-400"/>
+            <input 
+              type="date" 
+              value={dailySearchDate} 
+              onChange={e => setDailySearchDate(e.target.value)} 
+              className="bg-transparent border-none outline-none font-black text-slate-700 py-2 px-1 text-sm w-full md:w-36"
+            />
+            {dailySearchDate && (
+              <button onClick={() => setDailySearchDate("")} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 transition-all">
+                <X size={14}/>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {dailySearchDate ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+            {dailyLeaves.length > 0 ? (
+              dailyLeaves.map((rec, idx) => (
+                <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start gap-4 hover:border-orange-200 transition-all group">
+                   <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-orange-600 text-xs flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                      {idx + 1}
+                   </div>
+                   <div className="overflow-hidden">
+                      <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
+                      <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{rec.dateInfo}</p>
+                   </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-3xl">
+                <p className="text-slate-400 font-bold text-sm">📅 此日期暂无任何请假记录</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-12 text-center bg-slate-50/50 border border-dashed border-slate-200 rounded-3xl">
+             <p className="text-slate-400 font-bold text-sm tracking-tight italic">请选择左上方的日期以开启每日快查功能</p>
+          </div>
+        )}
       </div>
 
       {/* Stats Table */}
