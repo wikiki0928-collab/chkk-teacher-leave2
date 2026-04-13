@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X } from 'lucide-react';
+import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X, Pencil } from 'lucide-react';
 import { isDateInRange } from '../utils/helpers';
 
 const StatsTab = ({
@@ -20,6 +20,7 @@ const StatsTab = ({
   bulanString,
   sortedAndFilteredStats,
   setDetailView,
+  setRecordToEdit,
   baselineCuti,
   filteredSjkcStats,
   historyRecords
@@ -137,15 +138,24 @@ const StatsTab = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
             {dailyLeaves.length > 0 ? (
               dailyLeaves.map((rec, idx) => (
-                <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start gap-4 hover:border-orange-200 transition-all group">
-                   <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-orange-600 text-xs flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                      {idx + 1}
+                <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start justify-between gap-4 hover:border-orange-200 transition-all group relative">
+                   <div className="flex items-start gap-4 overflow-hidden">
+                     <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-orange-600 text-xs flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                        {idx + 1}
+                     </div>
+                     <div className="overflow-hidden">
+                        <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
+                        <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{rec.dateInfo}</p>
+                     </div>
                    </div>
-                   <div className="overflow-hidden">
-                      <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
-                      <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
-                      <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{rec.dateInfo}</p>
-                   </div>
+                   <button 
+                     onClick={() => setRecordToEdit(rec)}
+                     className="p-2 text-slate-300 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                     title="修改记录"
+                   >
+                     <Pencil size={16}/>
+                   </button>
                 </div>
               ))
             ) : (

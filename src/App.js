@@ -404,6 +404,7 @@ export default function App() {
             bulanString={bulanString}
             sortedAndFilteredStats={sortedAndFilteredStats}
             setDetailView={setDetailView}
+            setRecordToEdit={setRecordToEdit}
             baselineCuti={baselineCuti}
             filteredSjkcStats={filteredSjkcStats}
             historyRecords={historyRecords}
