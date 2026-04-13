@@ -35,19 +35,19 @@ const DailyLeaveInspector = ({ historyRecords }) => {
 
         {/* Date Selector */}
         <div className="relative group">
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 px-6 py-4 rounded-2xl group-hover:border-blue-200 transition-all cursor-pointer">
+          <div className="relative flex items-center gap-3 bg-slate-50 border border-slate-100 px-6 py-4 rounded-2xl group-hover:border-blue-200 transition-all cursor-pointer">
             <Calendar className="text-slate-400" size={18} />
             <span className="text-sm font-black text-slate-700">{formatDate(selectedDate)}</span>
             <input 
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              className="absolute inset-0 opacity-0 cursor-pointer z-10"
             />
             <div className="ml-2 w-px h-4 bg-slate-200" />
             <button 
-              onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])} 
-              className="text-slate-300 hover:text-slate-500 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date().toISOString().split('T')[0]); }} 
+              className="relative z-20 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <X size={16} />
             </button>
