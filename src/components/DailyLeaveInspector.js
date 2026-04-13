@@ -4,11 +4,11 @@ import { isDateInRange } from '../utils/helpers';
 
 const DailyLeaveInspector = ({ historyRecords }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const dateInputRef = React.useRef(null);
 
   const filteredRecords = useMemo(() => {
     return historyRecords
       .filter(rec => isDateInRange(selectedDate, rec.dateInfo))
-      // Optional: Sort by name or time
       .sort((a, b) => a.teacher.localeCompare(b.teacher));
   }, [historyRecords, selectedDate]);
 
@@ -18,7 +18,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
   };
 
   return (
-    <div className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm space-y-8">
+    <div className="relative z-20 bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm space-y-8">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -35,19 +35,23 @@ const DailyLeaveInspector = ({ historyRecords }) => {
 
         {/* Date Selector */}
         <div className="relative group">
-          <div className="relative flex items-center gap-3 bg-slate-50 border border-slate-100 px-6 py-4 rounded-2xl group-hover:border-blue-200 transition-all cursor-pointer">
+          <div 
+            onClick={() => dateInputRef.current?.showPicker()}
+            className="flex items-center gap-3 bg-slate-50 border border-slate-100 px-6 py-4 rounded-2xl group-hover:border-blue-200 transition-all cursor-pointer"
+          >
             <Calendar className="text-slate-400" size={18} />
             <span className="text-sm font-black text-slate-700">{formatDate(selectedDate)}</span>
             <input 
+              ref={dateInputRef}
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              className="absolute inset-0 opacity-0 pointer-events-none"
             />
             <div className="ml-2 w-px h-4 bg-slate-200" />
             <button 
               onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date().toISOString().split('T')[0]); }} 
-              className="relative z-20 text-slate-400 hover:text-slate-600 transition-colors"
+              className="relative z-30 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <X size={16} />
             </button>
