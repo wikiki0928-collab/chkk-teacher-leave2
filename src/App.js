@@ -382,6 +382,7 @@ export default function App() {
             copyAndSave={copyAndSave}
             setShowHistory={setShowHistory}
             setShowManager={setShowManager}
+            historyRecords={historyRecords}
           />
         )}
 

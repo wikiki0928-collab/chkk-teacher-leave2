@@ -1,5 +1,5 @@
-import React from 'react';
 import { Briefcase, Cloud, History, FileText, Settings, Clock, CheckCircle2, Clipboard } from 'lucide-react';
+import DailyLeaveInspector from './DailyLeaveInspector';
 
 const LeaveSystemTab = ({
   user,
@@ -27,10 +27,13 @@ const LeaveSystemTab = ({
   finalMessage,
   copyAndSave,
   setShowHistory,
-  setShowManager
+  setShowManager,
+  historyRecords
 }) => {
   return (
     <div className="space-y-6">
+      <DailyLeaveInspector historyRecords={historyRecords} />
+
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-4">
