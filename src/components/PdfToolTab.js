@@ -89,7 +89,7 @@ const PdfToolTab = ({
                 
                 <button 
                   onClick={() => downloadImage(imgSrc, index)} 
-                  className="w-full py-4.5 bg-slate-900 text-white rounded-2xl font-black flex justify-center items-center gap-3 hover:bg-blue-600 transition-all active:scale-95"
+                  className="w-full py-4.5 bg-blue-50 text-blue-600 rounded-2xl font-black flex justify-center items-center gap-3 hover:bg-blue-600 hover:text-white transition-all active:scale-95 border border-blue-100"
                 >
                    <Download size={20}/> 保存至设备
                 </button>

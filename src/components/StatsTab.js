@@ -183,10 +183,10 @@ const StatsTab = ({
               <tr className="text-center font-black">
                 <th colSpan="4" className="bg-blue-50/50 border-2 border-slate-900 py-2.5 text-[10px]">JENIS CUTI</th>
                 <th rowSpan="2" className="bg-blue-50/50 border-2 border-slate-900 px-3 py-2 w-28 text-[10px] leading-tight">DARI BULAN<br/>SEBELUMNYA</th>
-                <th rowSpan="2" className="bg-blue-600 text-white border-2 border-slate-900 px-3 py-2 w-32 text-[10px] leading-tight font-black">JUMLAH CUTI<br/>AKHIR BULAN</th>
+                <th rowSpan="2" className="bg-blue-50 text-blue-700 border-2 border-slate-900 px-3 py-2 w-32 text-[10px] leading-tight font-black">JUMLAH CUTI<br/>AKHIR BULAN</th>
                 <th rowSpan="2" className="bg-emerald-50 border-2 border-slate-900 px-3 py-2 w-28 text-[10px] leading-tight">BILANGAN<br/>RASMI</th>
                 <th rowSpan="2" className="bg-emerald-50 border-2 border-slate-900 px-3 py-2 w-28 text-[10px] leading-tight text-slate-500">RASMI BULAN<br/>LEPAS</th>
-                <th rowSpan="2" className="bg-emerald-600 text-white border-2 border-slate-900 px-3 py-2 w-32 text-[10px] leading-tight font-black">JUMLAH RASMI<br/>TERKUMPUL</th>
+                <th rowSpan="2" className="bg-emerald-50 text-emerald-700 border-2 border-slate-900 px-3 py-2 w-32 text-[10px] leading-tight font-black">JUMLAH RASMI<br/>TERKUMPUL</th>
               </tr>
               <tr className="text-center font-black text-[9px] uppercase tracking-tighter">
                 <th className="bg-white border-2 border-slate-900 p-2 w-32">CRK/CR/CTR</th>

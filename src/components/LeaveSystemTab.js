@@ -50,7 +50,7 @@ const LeaveSystemTab = ({
         </div>
         <button 
           onClick={() => setShowHistory(true)} 
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 hover:text-slate-900 transition-all shadow-sm active:scale-95 border border-slate-200"
         >
           <History size={18}/> 历史记录
         </button>

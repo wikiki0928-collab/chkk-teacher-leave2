@@ -306,27 +306,27 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/90 backdrop-blur text-white px-8 py-4 rounded-2xl shadow-2xl font-bold text-sm animate-fade-in border border-white/10">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-white/95 backdrop-blur-md text-slate-900 px-8 py-4 rounded-2xl shadow-2xl font-bold text-sm animate-fade-in border border-slate-200">
           {toastMsg}
         </div>
       )}
 
       {/* Header Area */}
-      <div className="bg-slate-900 text-white pt-10 pb-20 px-4">
+      <div className="bg-white text-slate-900 pt-10 pb-20 px-4 border-b border-slate-100">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-black tracking-tight mb-2">老师请假管理系统 <span className="text-blue-500">v2.0</span></h1>
-            <p className="text-slate-400 font-medium">官方高清字体渲染 · 云端数据实时同步</p>
+            <h1 className="text-3xl font-black tracking-tight mb-2">老师请假管理系统 <span className="text-blue-600">v2.0</span></h1>
+            <p className="text-slate-500 font-medium">官方高清字体渲染 · 云端数据实时同步</p>
           </div>
           
-          <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
-            <button onClick={() => setActiveTab('leave')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('leave')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
               <Briefcase size={16}/> 请假登记
             </button>
-            <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+            <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
               <BarChart3 size={16}/> 数据统计
             </button>
-            <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+            <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
               <FileImage size={16}/> PDF转换
             </button>
           </div>
