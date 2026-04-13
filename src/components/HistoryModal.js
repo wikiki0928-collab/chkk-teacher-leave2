@@ -1,7 +1,7 @@
 import React from 'react';
-import { History, X, Trash2 } from 'lucide-react';
+import { History, X, Trash2, Pencil } from 'lucide-react';
 
-const HistoryModal = ({ isOpen, onClose, historyRecords, setRecordToDelete }) => {
+const HistoryModal = ({ isOpen, onClose, historyRecords, setRecordToDelete, setRecordToEdit }) => {
   if (!isOpen) return null;
 
   return (
@@ -30,9 +30,14 @@ const HistoryModal = ({ isOpen, onClose, historyRecords, setRecordToDelete }) =>
                      {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}
                   </div>
                 </div>
-                <button onClick={() => setRecordToDelete(rec)} className="absolute right-6 top-1/2 -translate-y-1/2 p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all text-red-100 group-hover:text-red-400">
-                  <Trash2 size={20}/>
-                </button>
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => setRecordToEdit(rec)} className="p-2.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all" title="修改记录">
+                    <Pencil size={18}/>
+                  </button>
+                  <button onClick={() => setRecordToDelete(rec)} className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all" title="删除记录">
+                    <Trash2 size={18}/>
+                  </button>
+                </div>
               </div>
             ))
           )}

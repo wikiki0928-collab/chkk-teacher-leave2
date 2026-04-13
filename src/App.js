@@ -16,8 +16,9 @@ import ManagerModal from './components/ManagerModal';
 import BaselineModal from './components/BaselineModal';
 import DetailViewModal from './components/DetailViewModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import EditRecordModal from './components/EditRecordModal';
 
-import { doc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, deleteDoc, addDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, appId } from './lib/firebase';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
 
   const [toastMsg, setToastMsg] = useState("");
   const [recordToDelete, setRecordToDelete] = useState(null);
+  const [recordToEdit, setRecordToEdit] = useState(null);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -136,6 +138,16 @@ export default function App() {
       showToast("❌ 删除失败");
     } finally {
       setRecordToDelete(null);
+    }
+  };
+
+  const handleUpdateRecord = async (id, updatedData) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', id), updatedData);
+      showToast("✅ 记录已成功修改");
+    } catch (e) {
+      showToast("❌ 修改失败");
+      throw e;
     }
   };
 
@@ -346,7 +358,15 @@ export default function App() {
             customLeaveType={customLeaveType}
             setCustomLeaveType={setCustomLeaveType}
             startDate={startDate}
-            setStartDate={setStartDate}
+            setStartDate={(val) => {
+              const oldStart = startDate;
+              setStartDate(val);
+              // Logic: If it was a single day selection (start == end), sync end date to new start date.
+              // This makes 1-day leave registration extremely fast.
+              if (oldStart === endDate || val > endDate) {
+                setEndDate(val);
+              }
+            }}
             endDate={endDate}
             setEndDate={setEndDate}
             useTime={useTime}
@@ -406,11 +426,12 @@ export default function App() {
         )}
       </div>
 
-      <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} />
+      <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} setRecordToEdit={setRecordToEdit} />
       <ManagerModal showManager={showManager} onClose={() => setShowManager(null)} teachersList={teachersList} sortedTeachers={sortedTeachers} leaveTypesList={leaveTypesList} updateList={updateConfigList} />
       <BaselineModal showBaselineModal={showBaselineModal} onClose={() => setShowBaselineModal(false)} importText={importText} setImportText={setImportText} handleParseImport={handleParseImport} parsedBaseline={parsedBaseline} saveBaseline={handleSaveBaseline} />
-      <DetailViewModal detailView={detailView} onClose={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} baselineCuti={baselineCuti} detailRecords={detailRecords} setRecordToDelete={setRecordToDelete} bulanString={bulanString} statYear={statYear} />
+      <DetailViewModal detailView={detailView} onClose={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} baselineCuti={baselineCuti} detailRecords={detailRecords} setRecordToDelete={setRecordToDelete} setRecordToEdit={setRecordToEdit} bulanString={bulanString} statYear={statYear} />
       <DeleteConfirmModal recordToDelete={recordToDelete} onClose={() => setRecordToDelete(null)} onConfirm={confirmDeleteRecord} />
+      <EditRecordModal record={recordToEdit} onClose={() => setRecordToEdit(null)} onUpdate={handleUpdateRecord} teachersList={teachersList} leaveTypesList={leaveTypesList} />
     </div>
   );
 }

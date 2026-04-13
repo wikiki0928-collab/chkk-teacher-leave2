@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Database, X, CalendarDays, Trash2 } from 'lucide-react';
+import { User, Database, X, CalendarDays, Trash2, Pencil } from 'lucide-react';
 
 const DetailViewModal = ({
   detailView,
@@ -7,6 +7,7 @@ const DetailViewModal = ({
   baselineCuti,
   detailRecords,
   setRecordToDelete,
+  setRecordToEdit,
   bulanString,
   statYear
 }) => {
@@ -46,9 +47,14 @@ const DetailViewModal = ({
                 <div className="text-indigo-600 font-black flex items-center gap-2"><CalendarDays size={16}/> {rec.dateInfo}</div>
                 <div className="text-[10px] font-black text-slate-300 mt-2">记录创建于: {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleString() : '...'}</div>
               </div>
-              <button onClick={() => setRecordToDelete(rec)} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-full transition-all" title="删除此记录">
-                <Trash2 size={20}/>
-              </button>
+              <div className="flex items-center gap-1 opacity-100 transition-opacity">
+                <button onClick={() => setRecordToEdit(rec)} className="p-3 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition-all" title="修改记录">
+                  <Pencil size={20}/>
+                </button>
+                <button onClick={() => setRecordToDelete(rec)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all" title="删除记录">
+                  <Trash2 size={20}/>
+                </button>
+              </div>
             </div>
           ))}
           {detailRecords.length === 0 && <div className="py-10 text-center text-slate-300 font-black">没有系统内新增的记录</div>}
