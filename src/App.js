@@ -4,8 +4,8 @@ import { Briefcase, BarChart3, FileImage, ClipboardCheck, Clipboard } from 'luci
 import { useFirebaseData } from './hooks/useFirebaseData';
 import { usePdfConverter } from './hooks/usePdfConverter';
 
-import { bulanMelayu } from './constants/data';
-import { countWorkDays, formatTimeTo12h, getRecordCategory } from './utils/helpers';
+import { bulanMelayu, hariMelayu } from './constants/data';
+import { countWorkDays, formatTimeTo12h, getRecordCategory, getDayName } from './utils/helpers';
 
 import LeaveSystemTab from './components/LeaveSystemTab';
 import StatsTab from './components/StatsTab';
@@ -92,13 +92,20 @@ export default function App() {
   const getDateLine = () => {
     const f = (d) => d.split("-").reverse().join(".");
     const datePart = startDate !== endDate ? `${f(startDate)} - ${f(endDate)}` : f(startDate);
-    let res = datePart;
+    
+    const dayPart = startDate !== endDate 
+      ? `${getDayName(startDate)} - ${getDayName(endDate)}` 
+      : getDayName(startDate);
+
+    let details = [dayPart];
+    
     if (leaveType.includes("CUTI REHAT") || leaveType.includes("CUTI SAKIT") || leaveType.includes("BERSALIN") || leaveType.includes("KECEMASAN")) {
-      res += ` (${countWorkDays(startDate, endDate)} HARI)`;
+      details.push(`${countWorkDays(startDate, endDate)} HARI`);
     } else if (useTime) {
-      res += ` (${formatTimeTo12h(startTime)} - ${isSelesai ? 'SELESAI' : formatTimeTo12h(endTime)})`;
+      details.push(`${formatTimeTo12h(startTime)} - ${isSelesai ? 'SELESAI' : formatTimeTo12h(endTime)}`);
     }
-    return res;
+
+    return `${datePart} (${details.join(", ")})`;
   };
 
   const finalMessage = `**${selectedTeacher}**\n${leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType}\n${getDateLine()}`;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { UserCheck, Calendar, X } from 'lucide-react';
-import { isDateInRange } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay } from '../utils/helpers';
 
 const DailyLeaveInspector = ({ historyRecords }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -78,7 +78,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
                   {rec.type}
                 </p>
                 <p className="text-[10px] font-bold text-slate-400 mt-2 font-sans italic">
-                  {rec.dateInfo}
+                  {enrichDateInfoWithDay(rec.dateInfo)}
                 </p>
               </div>
             </div>

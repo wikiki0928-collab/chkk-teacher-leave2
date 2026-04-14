@@ -1,5 +1,6 @@
 import React from 'react';
 import { History, X, Trash2, Pencil } from 'lucide-react';
+import { enrichDateInfoWithDay } from '../utils/helpers';
 
 const HistoryModal = ({ isOpen, onClose, historyRecords, setRecordToDelete, setRecordToEdit }) => {
   if (!isOpen) return null;
@@ -24,7 +25,7 @@ const HistoryModal = ({ isOpen, onClose, historyRecords, setRecordToDelete, setR
                   <div className="space-y-2">
                     <div className="font-black text-blue-600 text-xl leading-tight uppercase">{rec.teacher}</div>
                     <div className="text-slate-800 font-black text-sm">{rec.type}</div>
-                    <div className="text-slate-400 text-[10px] font-black uppercase tracking-wider">{rec.dateInfo}</div>
+                    <div className="text-slate-400 text-[10px] font-black uppercase tracking-wider">{enrichDateInfoWithDay(rec.dateInfo)}</div>
                   </div>
                   <div className="text-[10px] font-black text-slate-300 bg-slate-50 px-2 py-1 rounded-lg">
                      {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...'}

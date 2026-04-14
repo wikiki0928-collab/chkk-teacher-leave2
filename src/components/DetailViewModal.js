@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Database, X, CalendarDays, Trash2, Pencil } from 'lucide-react';
+import { enrichDateInfoWithDay } from '../utils/helpers';
 
 const DetailViewModal = ({
   detailView,
@@ -44,7 +45,7 @@ const DetailViewModal = ({
             <div key={rec.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group relative flex items-center justify-between">
               <div className="space-y-1 pr-10">
                 <div className="text-slate-800 font-black text-lg">{rec.type}</div>
-                <div className="text-indigo-600 font-black flex items-center gap-2"><CalendarDays size={16}/> {rec.dateInfo}</div>
+                <div className="text-indigo-600 font-black flex items-center gap-2"><CalendarDays size={16}/> {enrichDateInfoWithDay(rec.dateInfo)}</div>
                 <div className="text-[10px] font-black text-slate-300 mt-2">记录创建于: {rec.createdAt ? new Date(rec.createdAt.seconds * 1000).toLocaleString() : '...'}</div>
               </div>
               <div className="flex items-center gap-1 opacity-100 transition-opacity">

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X, Pencil } from 'lucide-react';
-import { isDateInRange } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay } from '../utils/helpers';
 
 const StatsTab = ({
   setShowBaselineModal,
@@ -146,7 +146,7 @@ const StatsTab = ({
                      <div className="overflow-hidden">
                         <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
                         <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{rec.dateInfo}</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{enrichDateInfoWithDay(rec.dateInfo)}</p>
                      </div>
                    </div>
                    <button 
