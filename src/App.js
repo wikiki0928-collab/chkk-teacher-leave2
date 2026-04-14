@@ -5,7 +5,7 @@ import { useFirebaseData } from './hooks/useFirebaseData';
 import { usePdfConverter } from './hooks/usePdfConverter';
 
 import { bulanMelayu, hariMelayu } from './constants/data';
-import { countWorkDays, formatTimeTo12h, getRecordCategory, getDayName } from './utils/helpers';
+import { countWorkDays, formatTimeTo12h, getRecordCategory, getDayName, getTodayYMD } from './utils/helpers';
 
 import LeaveSystemTab from './components/LeaveSystemTab';
 import StatsTab from './components/StatsTab';
@@ -60,8 +60,8 @@ export default function App() {
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [leaveType, setLeaveType] = useState("");
   const [customLeaveType, setCustomLeaveType] = useState("");
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(getTodayYMD());
+  const [endDate, setEndDate] = useState(getTodayYMD());
   const [useTime, setUseTime] = useState(false);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");

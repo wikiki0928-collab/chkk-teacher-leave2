@@ -83,7 +83,8 @@ export function usePdfConverter(showToast) {
       const content = await zip.generateAsync({ type: "blob" });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      link.download = `公函包_${new Date().toISOString().split('T')[0]}.zip`;
+      const dateStr = new Date().toLocaleDateString('en-CA'); // 'en-CA' often gives YYYY-MM-DD local
+      link.download = `公函包_${dateStr}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

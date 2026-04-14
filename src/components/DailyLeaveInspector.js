@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { UserCheck, Calendar, X } from 'lucide-react';
-import { isDateInRange, enrichDateInfoWithDay, getRecordCategory } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay, getRecordCategory, getTodayYMD } from '../utils/helpers';
 import { Pencil } from 'lucide-react';
 
 const DailyLeaveInspector = ({ historyRecords }) => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getTodayYMD());
   const dateInputRef = React.useRef(null);
 
   const { cutiRecords, rasmiRecords } = useMemo(() => {
@@ -56,7 +56,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
             />
             <div className="ml-2 w-px h-4 bg-slate-200" />
             <button 
-              onClick={(e) => { e.stopPropagation(); setSelectedDate(new Date().toISOString().split('T')[0]); }} 
+              onClick={(e) => { e.stopPropagation(); setSelectedDate(getTodayYMD()); }} 
               className="relative z-30 text-slate-400 hover:text-slate-600 transition-colors"
             >
               <X size={16} />

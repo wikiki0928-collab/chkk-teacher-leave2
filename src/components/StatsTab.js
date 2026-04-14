@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X, Pencil } from 'lucide-react';
-import { isDateInRange, enrichDateInfoWithDay, getRecordCategory } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay, getRecordCategory, getTodayYMD } from '../utils/helpers';
 
 const StatsTab = ({
   setShowBaselineModal,
@@ -25,13 +25,7 @@ const StatsTab = ({
   filteredSjkcStats,
   historyRecords
 }) => {
-  const [dailySearchDate, setDailySearchDate] = useState(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  });
+  const [dailySearchDate, setDailySearchDate] = useState(() => getTodayYMD());
 
   const { cutiRecords, rasmiRecords } = useMemo(() => {
     if (!dailySearchDate) return { cutiRecords: [], rasmiRecords: [] };
