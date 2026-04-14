@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, Database, Printer, Loader2, Search, MousePointerClick, CalendarDays, UserCheck, Calendar, X, Pencil } from 'lucide-react';
-import { isDateInRange, enrichDateInfoWithDay } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay, getRecordCategory } from '../utils/helpers';
 
 const StatsTab = ({
   setShowBaselineModal,
@@ -33,9 +33,13 @@ const StatsTab = ({
     return `${yyyy}-${mm}-${dd}`;
   });
 
-  const dailyLeaves = useMemo(() => {
-    if (!dailySearchDate) return [];
-    return historyRecords.filter(rec => isDateInRange(dailySearchDate, rec.dateInfo));
+  const { cutiRecords, rasmiRecords } = useMemo(() => {
+    if (!dailySearchDate) return { cutiRecords: [], rasmiRecords: [] };
+    const list = historyRecords.filter(rec => isDateInRange(dailySearchDate, rec.dateInfo));
+    return {
+      cutiRecords: list.filter(r => getRecordCategory(r.type) !== 'RASMI'),
+      rasmiRecords: list.filter(r => getRecordCategory(r.type) === 'RASMI')
+    };
   }, [dailySearchDate, historyRecords]);
 
   return (
@@ -135,30 +139,72 @@ const StatsTab = ({
         </div>
 
         {dailySearchDate ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-            {dailyLeaves.length > 0 ? (
-              dailyLeaves.map((rec, idx) => (
-                <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start justify-between gap-4 hover:border-orange-200 transition-all group relative">
-                   <div className="flex items-start gap-4 overflow-hidden">
-                     <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-orange-600 text-xs flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                        {idx + 1}
+          <div className="space-y-10 animate-fade-in">
+            {cutiRecords.length > 0 && (
+              <div className="space-y-4">
+                 <div className="flex items-center gap-3 border-l-4 border-orange-500 pl-4">
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">📁 请假人员 (CUTI)</h3>
+                    <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[10px] font-black">{cutiRecords.length}</span>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                   {cutiRecords.map((rec, idx) => (
+                     <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start justify-between gap-4 hover:border-orange-200 transition-all group relative">
+                        <div className="flex items-start gap-4 overflow-hidden">
+                          <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-orange-600 text-xs flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                             {idx + 1}
+                          </div>
+                          <div className="overflow-hidden">
+                             <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
+                             <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
+                             <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{enrichDateInfoWithDay(rec.dateInfo)}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setRecordToEdit(rec)}
+                          className="p-2 text-slate-300 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          title="修改记录"
+                        >
+                          <Pencil size={16}/>
+                        </button>
                      </div>
-                     <div className="overflow-hidden">
-                        <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
-                        <p className="text-xs font-bold text-orange-500 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{enrichDateInfoWithDay(rec.dateInfo)}</p>
+                   ))}
+                 </div>
+              </div>
+            )}
+
+            {rasmiRecords.length > 0 && (
+              <div className="space-y-4">
+                 <div className="flex items-center gap-3 border-l-4 border-emerald-500 pl-4">
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">💼 职务人员 (CUTI RASMI)</h3>
+                    <span className="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full text-[10px] font-black">{rasmiRecords.length}</span>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                   {rasmiRecords.map((rec, idx) => (
+                     <div key={idx} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 flex items-start justify-between gap-4 hover:border-emerald-200 transition-all group relative">
+                        <div className="flex items-start gap-4 overflow-hidden">
+                          <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center font-black text-emerald-600 text-xs flex-shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                             {idx + 1}
+                          </div>
+                          <div className="overflow-hidden">
+                             <h4 className="font-black text-slate-800 text-sm truncate">{rec.teacher}</h4>
+                             <p className="text-xs font-bold text-emerald-600 mt-0.5 uppercase tracking-tighter truncate">{rec.type}</p>
+                             <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase italic">{enrichDateInfoWithDay(rec.dateInfo)}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setRecordToEdit(rec)}
+                          className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          title="修改记录"
+                        >
+                          <Pencil size={16}/>
+                        </button>
                      </div>
-                   </div>
-                   <button 
-                     onClick={() => setRecordToEdit(rec)}
-                     className="p-2 text-slate-300 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                     title="修改记录"
-                   >
-                     <Pencil size={16}/>
-                   </button>
-                </div>
-              ))
-            ) : (
+                   ))}
+                 </div>
+              </div>
+            )}
+
+            {(cutiRecords.length === 0 && rasmiRecords.length === 0) && (
               <div className="col-span-full py-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-3xl">
                 <p className="text-slate-400 font-bold text-sm">📅 此日期暂无任何请假记录</p>
               </div>

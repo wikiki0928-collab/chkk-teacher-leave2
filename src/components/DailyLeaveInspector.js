@@ -1,15 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { UserCheck, Calendar, X } from 'lucide-react';
-import { isDateInRange, enrichDateInfoWithDay } from '../utils/helpers';
+import { isDateInRange, enrichDateInfoWithDay, getRecordCategory } from '../utils/helpers';
+import { Pencil } from 'lucide-react';
 
 const DailyLeaveInspector = ({ historyRecords }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const dateInputRef = React.useRef(null);
 
-  const filteredRecords = useMemo(() => {
-    return historyRecords
+  const { cutiRecords, rasmiRecords } = useMemo(() => {
+    const list = historyRecords
       .filter(rec => isDateInRange(selectedDate, rec.dateInfo))
       .sort((a, b) => a.teacher.localeCompare(b.teacher));
+    
+    return {
+      cutiRecords: list.filter(r => getRecordCategory(r.type) !== 'RASMI'),
+      rasmiRecords: list.filter(r => getRecordCategory(r.type) === 'RASMI')
+    };
   }, [historyRecords, selectedDate]);
 
   const formatDate = (dateStr) => {
@@ -60,32 +66,74 @@ const DailyLeaveInspector = ({ historyRecords }) => {
       </div>
 
       {/* Grid of Absent Teachers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRecords.length > 0 ? (
-          filteredRecords.map((rec, index) => (
-            <div 
-              key={rec.id} 
-              className="group bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-blue-100 hover:shadow-xl hover:shadow-blue-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
-            >
-              <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-sm font-black text-orange-500 shadow-sm group-hover:scale-110 transition-transform">
-                {index + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-[15px] font-black text-slate-800 truncate mb-1 uppercase">
-                  {rec.teacher}
-                </h3>
-                <p className="text-[11px] font-black text-orange-500 uppercase tracking-wide leading-tight line-clamp-2">
-                  {rec.type}
-                </p>
-                <p className="text-[10px] font-bold text-slate-400 mt-2 font-sans italic">
-                  {enrichDateInfoWithDay(rec.dateInfo)}
-                </p>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="col-span-full py-12 flex flex-col items-center justify-center bg-slate-50/50 rounded-[24px] border border-dashed border-slate-200">
-            <p className="text-slate-400 font-bold text-sm">今天暂无任何请假记录</p>
+      <div className="space-y-10">
+        {cutiRecords.length > 0 && (
+          <div className="space-y-4">
+             <div className="flex items-center gap-3 border-l-4 border-orange-500 pl-4">
+                <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">📁 请假人员 (CUTI)</h3>
+                <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[10px] font-black">{cutiRecords.length}</span>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {cutiRecords.map((rec, index) => (
+                 <div 
+                   key={rec.id} 
+                   className="group bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-orange-100 hover:shadow-xl hover:shadow-orange-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
+                 >
+                   <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-sm font-black text-orange-500 shadow-sm group-hover:scale-110 transition-transform">
+                     {index + 1}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <h3 className="text-[15px] font-black text-slate-800 truncate mb-1 uppercase">
+                       {rec.teacher}
+                     </h3>
+                     <p className="text-[11px] font-black text-orange-500 uppercase tracking-wide leading-tight line-clamp-2">
+                       {rec.type}
+                     </p>
+                     <p className="text-[10px] font-bold text-slate-400 mt-2 font-sans italic">
+                       {enrichDateInfoWithDay(rec.dateInfo)}
+                     </p>
+                   </div>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+
+        {rasmiRecords.length > 0 && (
+          <div className="space-y-4">
+             <div className="flex items-center gap-3 border-l-4 border-emerald-500 pl-4">
+                <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">💼 职务人员 (CUTI RASMI)</h3>
+                <span className="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full text-[10px] font-black">{rasmiRecords.length}</span>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {rasmiRecords.map((rec, index) => (
+                 <div 
+                   key={rec.id} 
+                   className="group bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
+                 >
+                   <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-sm font-black text-emerald-500 shadow-sm group-hover:scale-110 transition-transform">
+                     {index + 1}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <h3 className="text-[15px] font-black text-slate-800 truncate mb-1 uppercase">
+                       {rec.teacher}
+                     </h3>
+                     <p className="text-[11px] font-black text-emerald-600 uppercase tracking-wide leading-tight line-clamp-2">
+                       {rec.type}
+                     </p>
+                     <p className="text-[10px] font-bold text-slate-400 mt-2 font-sans italic">
+                       {enrichDateInfoWithDay(rec.dateInfo)}
+                     </p>
+                   </div>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+
+        {(cutiRecords.length === 0 && rasmiRecords.length === 0) && (
+          <div className="py-12 flex flex-col items-center justify-center bg-slate-50/50 rounded-[24px] border border-dashed border-slate-200">
+            <p className="text-slate-400 font-bold text-sm">此日期暂无任何请假记录</p>
           </div>
         )}
       </div>
