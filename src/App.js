@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Briefcase, BarChart3, FileImage, ClipboardCheck, Clipboard } from 'lucide-react';
+import { Briefcase, BarChart3, FileImage, ClipboardCheck, Clipboard, Calendar } from 'lucide-react';
 
 import { useFirebaseData } from './hooks/useFirebaseData';
 import { usePdfConverter } from './hooks/usePdfConverter';
@@ -10,6 +10,7 @@ import { countWorkDays, formatTimeTo12h, getRecordCategory, getDayName, getToday
 import LeaveSystemTab from './components/LeaveSystemTab';
 import StatsTab from './components/StatsTab';
 import PdfToolTab from './components/PdfToolTab';
+import CalendarTab from './components/CalendarTab';
 
 import HistoryModal from './components/HistoryModal';
 import ManagerModal from './components/ManagerModal';
@@ -125,6 +126,8 @@ export default function App() {
         teacher: selectedTeacher,
         type: leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType,
         dateInfo: getDateLine(),
+        startDate: startDate,
+        endDate: endDate,
         createdAt: serverTimestamp()
       });
       showToast("✅ 已存入历史记录并开启云端副本");
@@ -345,6 +348,9 @@ export default function App() {
             <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
               <BarChart3 size={16}/> 数据统计
             </button>
+            <button onClick={() => setActiveTab('calendar')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'calendar' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
+              <Calendar size={16}/> 请假日历
+            </button>
             <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
               <FileImage size={16}/> PDF转换
             </button>
@@ -431,6 +437,14 @@ export default function App() {
             downloadAllAsZip={downloadAllAsZip}
             isZipping={isZipping}
             downloadImage={(url, idx) => { const a = document.createElement('a'); a.href = url; a.download = `Page_${idx+1}.jpg`; a.click(); }}
+          />
+        )}
+        
+        {activeTab === 'calendar' && (
+          <CalendarTab 
+            historyRecords={historyRecords}
+            bulanMelayu={bulanMelayu}
+            hariMelayu={hariMelayu}
           />
         )}
       </div>

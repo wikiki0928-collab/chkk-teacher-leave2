@@ -102,8 +102,11 @@ const EditRecordModal = ({ record, onClose, onUpdate, teachersList, leaveTypesLi
       await onUpdate(record.id, {
         teacher,
         type: isOtherType ? customType.toUpperCase() : type,
-        dateInfo: getDateLine()
+        dateInfo: getDateLine(),
+        startDate,
+        endDate
       });
+        // Note: No need to modify onUpdate in App.js as it already passes through the object
       onClose();
     } catch (error) {
       console.error("Update failed:", error);
