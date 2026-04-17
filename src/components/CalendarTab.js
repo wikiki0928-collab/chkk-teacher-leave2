@@ -81,14 +81,16 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
         <div 
           className="fixed z-[999] pointer-events-none hidden md:block" 
           style={{ 
-            left: hoveredRecord.x + 20, 
+            left: hoveredRecord.x > window.innerWidth / 2 ? hoveredRecord.x - 240 : hoveredRecord.x + 20, 
             top: hoveredRecord.y + 20,
-            transition: 'all 0.1s ease-out'
+            transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
+            transform: hoveredRecord ? 'scale(1)' : 'scale(0.95)',
+            opacity: hoveredRecord ? 1 : 0
           }}
         >
-          <div className="bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-4 min-w-[220px] ring-1 ring-black/5">
+          <div className="bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-4 min-w-[220px] max-w-[280px] ring-1 ring-black/5">
             <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-1">{hoveredRecord.type}</p>
-            <h4 className="text-lg font-black text-slate-800 leading-tight">{hoveredRecord.teacher}</h4>
+            <h4 className="text-lg font-black text-slate-800 leading-tight break-words">{hoveredRecord.teacher}</h4>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
               <p className="text-[10px] font-bold text-slate-500 uppercase">{hoveredRecord.dateInfo.split('(')[0]}</p>
