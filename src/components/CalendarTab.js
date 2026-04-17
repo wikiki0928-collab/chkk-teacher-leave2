@@ -28,9 +28,30 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
   const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
   const goToToday = () => setViewDate(new Date());
 
+  // Process all records to ensure they have startDate/endDate (fallback to dateInfo parsing)
+  const processedRecords = useMemo(() => {
+    return historyRecords.map(rec => {
+      if (rec.startDate && rec.endDate) return rec;
+
+      // Fallback: parse from dateInfo string (format: DD.MM.YYYY)
+      const dateMatches = (rec.dateInfo || '').match(/(\d{2})\.(\d{2})\.(\d{4})/g);
+      if (dateMatches && dateMatches[0]) {
+        const [d1, m1, y1] = dateMatches[0].split('.');
+        const startDate = `${y1}-${m1}-${d1}`;
+        let endDate = startDate;
+        if (dateMatches[1]) {
+          const [d2, m2, y2] = dateMatches[1].split('.');
+          endDate = `${y2}-${m2}-${d2}`;
+        }
+        return { ...rec, startDate, endDate };
+      }
+      return rec;
+    });
+  }, [historyRecords]);
+
   // Filter and process records for the current view
   const currentMonthRecords = useMemo(() => {
-    return historyRecords.filter(rec => {
+    return processedRecords.filter(rec => {
       if (!rec.startDate || !rec.endDate) return false;
       
       const s = new Date(rec.startDate);
@@ -155,10 +176,10 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
       </div>
 
       {/* Info Warning */}
-      <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-        <Info className="text-amber-500 shrink-0" size={18} />
-        <p className="text-xs font-semibold text-amber-700 leading-relaxed">
-          <b>提示：</b> 只有在此功能上线后新录入或修改的请假单才会显示在日历上。之前的历史数据由于缺失精确日期信息，将仅保留在统计列表中。
+      <div className="flex items-start gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+        <Info className="text-emerald-500 shrink-0" size={18} />
+        <p className="text-xs font-semibold text-emerald-700 leading-relaxed">
+          <b>提示：</b> 系统已自动解析所有历史记录。只要记录中包含有效的日期信息，它们都会呈现在日历上。
         </p>
       </div>
     </div>
