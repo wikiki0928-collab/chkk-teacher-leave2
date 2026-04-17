@@ -209,7 +209,7 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
           <b>提示：</b> 系统已自动解析所有历史记录。只要记录中包含有效的日期信息，它们都会呈现在日历上。
         </p>
       </div>
-    </div>
+    </>
   );
 };
 
