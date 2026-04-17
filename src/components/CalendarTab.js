@@ -17,6 +17,7 @@ const TYPE_COLORS = {
 
 const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
   const [viewDate, setViewDate] = useState(new Date());
+  const [hoveredRecord, setHoveredRecord] = useState(null);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -62,7 +63,7 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
       // Check for overlap
       return s <= viewEnd && e >= viewStart;
     });
-  }, [historyRecords, year, month]);
+  }, [processedRecords, year, month]);
 
   const getRecordsForDate = (day) => {
     const d = new Date(year, month, day);
@@ -74,7 +75,21 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {/* Custom Tooltip Overlay */}
+      {hoveredRecord && (
+        <div className="fixed z-[100] pointer-events-none hidden md:block" style={{ left: hoveredRecord.x + 10, top: hoveredRecord.y + 10 }}>
+          <div className="bg-white/90 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl p-4 min-w-[200px] animate-in zoom-in-95 duration-200">
+            <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-1">{hoveredRecord.type}</p>
+            <h4 className="text-lg font-black text-slate-800 leading-tight">{hoveredRecord.teacher}</h4>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase">{hoveredRecord.dateInfo.split('(')[0]}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Calendar Header */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
@@ -157,8 +172,12 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
                   {records.map(rec => (
                     <div 
                       key={rec.id} 
-                      className={`px-2 py-1 rounded-lg text-[9px] font-bold border truncate hover:brightness-95 transition-all text-center ${TYPE_COLORS[rec.type] || TYPE_COLORS.DEFAULT}`}
-                      title={`${rec.teacher} - ${rec.type}`}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-bold border truncate cursor-pointer transition-all text-center hover:scale-105 hover:shadow-md ${TYPE_COLORS[rec.type] || TYPE_COLORS.DEFAULT}`}
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredRecord({ ...rec, x: rect.left, y: rect.top });
+                      }}
+                      onMouseLeave={() => setHoveredRecord(null)}
                     >
                       {rec.teacher.split(' ')[0]}
                     </div>
