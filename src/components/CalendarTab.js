@@ -182,10 +182,9 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
                   {records.map(rec => (
                     <div 
                       key={rec.id} 
-                      className={`px-2 py-1 rounded-lg text-[9px] font-bold border truncate cursor-pointer transition-all text-center hover:scale-105 hover:shadow-md ${TYPE_COLORS[rec.type] || TYPE_COLORS.DEFAULT}`}
+                      className={`px-2 py-1 rounded-lg text-[9px] font-bold border truncate cursor-pointer transition-all text-center hover:brightness-95 hover:shadow-sm ${TYPE_COLORS[rec.type] || TYPE_COLORS.DEFAULT}`}
                       onMouseEnter={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setHoveredRecord({ ...rec, x: rect.left, y: rect.top });
+                        setHoveredRecord({ ...rec, x: e.clientX, y: e.clientY });
                       }}
                       onMouseLeave={() => setHoveredRecord(null)}
                     >
