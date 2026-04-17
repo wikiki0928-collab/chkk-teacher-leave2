@@ -75,11 +75,18 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 relative">
-      {/* Custom Tooltip Overlay */}
+    <>
+      {/* Custom Tooltip Overlay - MOVED OUTSIDE ANIMATED CONTAINER */}
       {hoveredRecord && (
-        <div className="fixed z-[100] pointer-events-none hidden md:block" style={{ left: hoveredRecord.x + 20, top: hoveredRecord.y + 20 }}>
-          <div className="bg-white/95 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl p-4 min-w-[220px] animate-in zoom-in-95 duration-150">
+        <div 
+          className="fixed z-[999] pointer-events-none hidden md:block" 
+          style={{ 
+            left: hoveredRecord.x + 20, 
+            top: hoveredRecord.y + 20,
+            transition: 'all 0.1s ease-out'
+          }}
+        >
+          <div className="bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-4 min-w-[220px] ring-1 ring-black/5">
             <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-1">{hoveredRecord.type}</p>
             <h4 className="text-lg font-black text-slate-800 leading-tight">{hoveredRecord.teacher}</h4>
             <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
@@ -90,7 +97,8 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
         </div>
       )}
 
-      {/* Calendar Header */}
+      <div className="space-y-6 animate-in fade-in duration-500 relative">
+        {/* Calendar Header */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
