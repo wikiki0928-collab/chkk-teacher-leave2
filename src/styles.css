@@ -42,3 +42,22 @@
 .animate-fade-in {
   animation: fade-in 0.4s ease-out forwards;
 }
+
+/* 
+  Fix for transparent date inputs in iframes (e.g. Google Sites).
+  This makes the native calendar trigger cover the entire input area,
+  ensuring that clicking anywhere on the input opens the picker.
+*/
+input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    color: transparent;
+    background: transparent;
+    cursor: pointer;
+    z-index: 10;
+}
