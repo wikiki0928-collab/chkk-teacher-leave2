@@ -85,7 +85,7 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
         <div 
           className="fixed z-[999] pointer-events-none hidden md:block" 
           style={{ 
-            left: hoveredRecord.x > window.innerWidth / 2 ? hoveredRecord.x - 240 : hoveredRecord.x + 20, 
+            left: hoveredRecord.x > window.innerWidth / 2 ? hoveredRecord.x - 300 : hoveredRecord.x + 20, 
             top: hoveredRecord.y + 20,
             transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
             transform: hoveredRecord ? 'scale(1)' : 'scale(0.95)',
