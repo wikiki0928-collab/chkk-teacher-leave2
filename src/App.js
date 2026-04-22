@@ -111,14 +111,48 @@ export default function App() {
 
   const finalMessage = `**${selectedTeacher}**\n${leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType}\n${getDateLine()}`;
 
-  const copyAndSave = async () => {
+  const fallbackCopyTextToClipboard = (text) => {
     try {
-      await navigator.clipboard.writeText(finalMessage);
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const copyAndSave = async () => {
+    let copySuccess = false;
+    
+    // 1. 尝试复制文本 (通过 try-catch 单独包裹，避免因为 iframe 权限引起整个函数崩溃)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(finalMessage);
+        copySuccess = true;
+      } else {
+        copySuccess = fallbackCopyTextToClipboard(finalMessage);
+      }
+    } catch (err) {
+      copySuccess = fallbackCopyTextToClipboard(finalMessage);
+    }
+
+    if (copySuccess) {
       setCopiedStatus(true);
       setTimeout(() => setCopiedStatus(false), 2000);
+    }
 
+    // 2. 执行云端存档
+    try {
       if (!user) {
-        showToast("离线模式：未能存档到云端！");
+        showToast(copySuccess ? "复制成功！离线模式未能存档到云端！" : "⚠️ 复制受限！离线模式未能存档到云端！");
         return;
       }
       
@@ -130,9 +164,10 @@ export default function App() {
         endDate: endDate,
         createdAt: serverTimestamp()
       });
-      showToast("✅ 已存入历史记录并开启云端副本");
+      showToast(copySuccess ? "✅ 已复制并存入历史记录" : "✅ 存入记录成功 (Google Sites等环境受限，请手动复制)");
     } catch (e) {
-      showToast("❌ 存档或复制失败");
+      showToast("❌ 存档失败");
+      console.error(e);
     }
   };
 
