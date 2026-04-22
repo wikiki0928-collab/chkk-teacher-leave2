@@ -52,25 +52,29 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
 
   // Filter and process records for the current view
   const currentMonthRecords = useMemo(() => {
+    const yStr = year;
+    const mStr = String(month + 1).padStart(2, '0');
+    const viewStartStr = `${yStr}-${mStr}-01`;
+    
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const viewEndStr = `${yStr}-${mStr}-${String(lastDay).padStart(2, '0')}`;
+
     return processedRecords.filter(rec => {
       if (!rec.startDate || !rec.endDate) return false;
       
-      const s = new Date(rec.startDate);
-      const e = new Date(rec.endDate);
-      const viewStart = new Date(year, month, 1);
-      const viewEnd = new Date(year, month + 1, 0);
-
-      // Check for overlap
-      return s <= viewEnd && e >= viewStart;
+      // Check for overlap: record starts before/on view end AND ends after/on view start
+      return rec.startDate <= viewEndStr && rec.endDate >= viewStartStr;
     });
   }, [processedRecords, year, month]);
 
   const getRecordsForDate = (day) => {
-    const d = new Date(year, month, day);
-    const dStr = d.toISOString().split('T')[0];
+    const yStr = year;
+    const mStr = String(month + 1).padStart(2, '0');
+    const dStr = String(day).padStart(2, '0');
+    const currentDateStr = `${yStr}-${mStr}-${dStr}`;
     
     return currentMonthRecords.filter(rec => {
-      return dStr >= rec.startDate && dStr <= rec.endDate;
+      return currentDateStr >= rec.startDate && currentDateStr <= rec.endDate;
     });
   };
 
