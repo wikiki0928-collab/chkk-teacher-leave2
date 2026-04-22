@@ -40,28 +40,39 @@ const DailyLeaveInspector = ({ historyRecords }) => {
         </div>
 
         {/* Date Selector */}
-        <div className="relative group">
-          <div 
-            onClick={() => dateInputRef.current?.showPicker()}
-            className="flex items-center gap-3 bg-slate-50 border border-slate-100 px-6 py-4 rounded-2xl group-hover:border-blue-200 transition-all cursor-pointer"
-          >
+        <div className="relative flex items-center bg-slate-50 border border-slate-100 rounded-2xl hover:border-blue-300 transition-all">
+          {/* Custom Visual Label */}
+          <div className="flex items-center gap-3 px-6 py-4 pointer-events-none">
             <Calendar className="text-slate-400" size={18} />
             <span className="text-sm font-black text-slate-700">{formatDate(selectedDate)}</span>
-            <input 
-              ref={dateInputRef}
-              type="date" 
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute inset-0 opacity-0 pointer-events-none"
-            />
-            <div className="ml-2 w-px h-4 bg-slate-200" />
-            <button 
-              onClick={(e) => { e.stopPropagation(); setSelectedDate(getTodayYMD()); }} 
-              className="relative z-30 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X size={16} />
-            </button>
           </div>
+
+          {/* Actual Invisible Date Input Overlay */}
+          <input 
+            type="date" 
+            value={selectedDate}
+            onChange={(e) => {
+              if (e.target.value) setSelectedDate(e.target.value);
+            }}
+            className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
+          />
+
+          {/* Vertical Divider */}
+          <div className="w-px h-4 bg-slate-200" />
+
+          {/* Reset to Today Button - Higher Z-Index */}
+          <button 
+            type="button"
+            onClick={(e) => { 
+              e.preventDefault();
+              e.stopPropagation(); 
+              setSelectedDate(getTodayYMD()); 
+            }} 
+            className="relative z-20 px-4 py-4 text-slate-400 hover:text-blue-600 transition-colors"
+            title="回今天"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 
