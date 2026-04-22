@@ -34,21 +34,27 @@ export const isDateInRange = (targetDateYMD, dateInfo) => {
   const rangeMatch = dateInfo.match(/(\d{2})\.(\d{2})\.(\d{4})(?:\s*-\s*(\d{2})\.(\d{2})\.(\d{4}))?/);
   if (!rangeMatch) return false;
 
-  const target = new Date(targetDateYMD);
-  target.setHours(0, 0, 0, 0);
+  // targetDateYMD is "YYYY-MM-DD"
+  const [ty, tm, td] = targetDateYMD.split('-').map(Number);
+  const targetVal = ty * 10000 + tm * 100 + td;
 
-  const sD = new Date(`${rangeMatch[3]}-${rangeMatch[2]}-${rangeMatch[1]}`);
-  sD.setHours(0, 0, 0, 0);
+  // start date
+  const sDay = parseInt(rangeMatch[1]);
+  const sMonth = parseInt(rangeMatch[2]);
+  const sYear = parseInt(rangeMatch[3]);
+  const sVal = sYear * 10000 + sMonth * 100 + sDay;
 
-  let eD;
+  let eVal;
   if (rangeMatch[4]) {
-    eD = new Date(`${rangeMatch[6]}-${rangeMatch[5]}-${rangeMatch[4]}`);
+    const eDay = parseInt(rangeMatch[4]);
+    const eMonth = parseInt(rangeMatch[5]);
+    const eYear = parseInt(rangeMatch[6]);
+    eVal = eYear * 10000 + eMonth * 100 + eDay;
   } else {
-    eD = new Date(sD);
+    eVal = sVal;
   }
-  eD.setHours(0, 0, 0, 0);
 
-  return target >= sD && target <= eD;
+  return targetVal >= sVal && targetVal <= eVal;
 };
 
 export const getDayName = (dateStr) => {
