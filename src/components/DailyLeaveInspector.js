@@ -49,8 +49,16 @@ const DailyLeaveInspector = ({ historyRecords }) => {
 
           {/* Actual Invisible Date Input Overlay */}
           <input 
+            ref={dateInputRef}
             type="date" 
             value={selectedDate}
+            onClick={(e) => {
+              try {
+                if (typeof e.target.showPicker === 'function') {
+                  e.target.showPicker();
+                }
+              } catch (err) {}
+            }}
             onChange={(e) => {
               if (e.target.value) setSelectedDate(e.target.value);
             }}
