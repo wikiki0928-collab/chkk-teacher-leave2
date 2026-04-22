@@ -62,7 +62,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
             onChange={(e) => {
               if (e.target.value) setSelectedDate(e.target.value);
             }}
-            className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
+            className="full-cover-date-indicator absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
           />
 
           {/* Vertical Divider */}

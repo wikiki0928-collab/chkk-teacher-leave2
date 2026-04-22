@@ -48,7 +48,7 @@
   This makes the native calendar trigger cover the entire input area,
   ensuring that clicking anywhere on the input opens the picker.
 */
-input[type="date"]::-webkit-calendar-picker-indicator {
+.full-cover-date-indicator::-webkit-calendar-picker-indicator {
     position: absolute;
     top: 0;
     left: 0;
