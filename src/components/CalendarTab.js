@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info } from 'lucide-react';
 
 const TYPE_COLORS = {
@@ -81,7 +82,7 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
   return (
     <>
       {/* Custom Tooltip Overlay - MOVED OUTSIDE ANIMATED CONTAINER */}
-      {hoveredRecord && (
+      {hoveredRecord && createPortal(
         <div 
           className="fixed z-[999] pointer-events-none hidden md:block" 
           style={{ 
@@ -100,7 +101,8 @@ const CalendarTab = ({ historyRecords, bulanMelayu, hariMelayu }) => {
               <p className="text-[10px] font-bold text-slate-500 uppercase">{hoveredRecord.dateInfo.split('(')[0]}</p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="space-y-6 animate-in fade-in duration-500 relative">
