@@ -40,11 +40,19 @@ export default function App() {
     user,
     teachersList,
     leaveTypesList,
+    archivedTeachers,
     historyRecords,
+    availableYears,
     baselineCuti,
     isSyncing,
     updateConfigList,
-    saveBaselineData
+    saveBaselineData,
+    archiveTeacher,
+    restoreTeacher,
+    loadYearData,
+    subscribeToYear,
+    updateYearIndex,
+    invalidateCacheForYear,
   } = useFirebaseData(showToast);
 
   const {
@@ -89,6 +97,16 @@ export default function App() {
     if (sortedTeachers.length > 0 && !selectedTeacher) setSelectedTeacher(sortedTeachers[0]);
     if (leaveTypesList.length > 0 && !leaveType) setLeaveType(leaveTypesList[0]);
   }, [sortedTeachers, leaveTypesList, selectedTeacher, leaveType]);
+
+  // When statYear changes to a past year, load its data on demand
+  const currentCalendarYear = new Date().getFullYear().toString();
+  useEffect(() => {
+    if (statYear === currentCalendarYear) {
+      // Current year is already handled by the real-time listener
+      return;
+    }
+    loadYearData(statYear);
+  }, [statYear, loadYearData, currentCalendarYear]);
 
   const getDateLine = () => {
     const f = (d) => d.split("-").reverse().join(".");
@@ -164,6 +182,9 @@ export default function App() {
         endDate: endDate,
         createdAt: serverTimestamp()
       });
+      // Ensure the leave's year is registered in the year index
+      const leaveYear = startDate.substring(0, 4);
+      await updateYearIndex(leaveYear);
       showToast(copySuccess ? "✅ 已复制并存入历史记录" : "✅ 存入记录成功 (Google Sites等环境受限，请手动复制)");
     } catch (e) {
       showToast("❌ 存档失败");
@@ -175,6 +196,8 @@ export default function App() {
     if (!recordToDelete) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', recordToDelete.id));
+      // Invalidate cache for that record's year so next load is fresh
+      if (recordToDelete.startDate) invalidateCacheForYear(recordToDelete.startDate.substring(0, 4));
       showToast("✅ 记录已成功删除");
       if (detailView.isOpen && detailRecords.length <= 1) {
         setDetailView({ ...detailView, isOpen: false });
@@ -189,6 +212,8 @@ export default function App() {
   const handleUpdateRecord = async (id, updatedData) => {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leave_history', id), updatedData);
+      // Invalidate cache for old year and new year
+      if (updatedData.startDate) invalidateCacheForYear(updatedData.startDate.substring(0, 4));
       showToast("✅ 记录已成功修改");
     } catch (e) {
       showToast("❌ 修改失败");
@@ -196,14 +221,7 @@ export default function App() {
     }
   };
 
-  const availableYears = useMemo(() => {
-    const years = new Set([new Date().getFullYear().toString()]);
-    historyRecords.forEach(rec => {
-      const match = rec.dateInfo.match(/\d{4}/);
-      if (match) years.add(match[0]);
-    });
-    return Array.from(years).sort().reverse();
-  }, [historyRecords]);
+  // availableYears now comes from the hook (year_index in Firestore)
 
   const sjkcStats = useMemo(() => {
     const statsMap = {};
@@ -484,8 +502,8 @@ export default function App() {
         )}
       </div>
 
-      <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} setRecordToEdit={setRecordToEdit} />
-      <ManagerModal showManager={showManager} onClose={() => setShowManager(null)} teachersList={teachersList} sortedTeachers={sortedTeachers} leaveTypesList={leaveTypesList} updateList={updateConfigList} />
+      <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} setRecordToEdit={setRecordToEdit} loadYearData={loadYearData} availableYears={availableYears} />
+      <ManagerModal showManager={showManager} onClose={() => setShowManager(null)} teachersList={teachersList} sortedTeachers={sortedTeachers} leaveTypesList={leaveTypesList} updateList={updateConfigList} archivedTeachers={archivedTeachers} archiveTeacher={archiveTeacher} restoreTeacher={restoreTeacher} historyRecords={historyRecords} loadYearData={loadYearData} availableYears={availableYears} />
       <BaselineModal showBaselineModal={showBaselineModal} onClose={() => setShowBaselineModal(false)} importText={importText} setImportText={setImportText} handleParseImport={handleParseImport} parsedBaseline={parsedBaseline} saveBaseline={handleSaveBaseline} />
       <DetailViewModal detailView={detailView} onClose={() => setDetailView({ isOpen: false, teacher: '', category: '', monthFilter: '' })} baselineCuti={baselineCuti} detailRecords={detailRecords} setRecordToDelete={setRecordToDelete} setRecordToEdit={setRecordToEdit} bulanString={bulanString} statYear={statYear} />
       <DeleteConfirmModal recordToDelete={recordToDelete} onClose={() => setRecordToDelete(null)} onConfirm={confirmDeleteRecord} />
