@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, Info, X, Archive, RotateCcw, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { User, Info, X, Archive, RotateCcw, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Loader2, Database } from 'lucide-react';
 import { enrichDateInfoWithDay } from '../utils/helpers';
 
 const ArchiveConfirmDialog = ({ teacherName, onConfirm, onCancel }) => (
@@ -25,14 +25,16 @@ const ArchiveConfirmDialog = ({ teacherName, onConfirm, onCancel }) => (
   </div>
 );
 
-const ArchivedTeacherCard = ({ name, allRecords, isLoadingAllYears }) => {
+const ArchivedTeacherCard = ({ name, allRecords, isLoadingAllYears, baselineValue }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const teacherRecords = useMemo(() =>
-    allRecords.filter(r => r.teacher === name)
-      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)),
-    [allRecords, name]
-  );
+  const teacherRecords = useMemo(() => {
+    const targetName = name.trim().toUpperCase();
+    return allRecords.filter(r => (r.teacher || '').trim().toUpperCase() === targetName)
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  }, [allRecords, name]);
+
+  const hasData = teacherRecords.length > 0 || (baselineValue && baselineValue > 0);
 
   return (
     <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden transition-all hover:border-amber-300">
@@ -44,9 +46,16 @@ const ArchivedTeacherCard = ({ name, allRecords, isLoadingAllYears }) => {
               <Loader2 size={10} className="animate-spin"/> 加载中...
             </p>
           ) : (
-            <p className="text-[10px] font-bold text-amber-500 mt-1 uppercase tracking-wider">
-              {teacherRecords.length > 0 ? `共 ${teacherRecords.length} 条历史请假记录` : '暂无请假记录'}
-            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+              {baselineValue > 0 && (
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-wider flex items-center gap-1">
+                  <Database size={10}/> 导入底数: {baselineValue} 天
+                </p>
+              )}
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${teacherRecords.length > 0 ? 'text-amber-500' : 'text-slate-300'}`}>
+                {teacherRecords.length > 0 ? `历史记录: ${teacherRecords.length} 条` : '无历史假条'}
+              </p>
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -80,7 +89,7 @@ const ManagerModal = ({
   showManager, onClose,
   teachersList, sortedTeachers, leaveTypesList, updateList,
   archivedTeachers = [], archiveTeacher, restoreTeacher,
-  historyRecords = [], loadYearData, availableYears = []
+  historyRecords = [], baselineCuti = {}, loadYearData, availableYears = []
 }) => {
   const [activeTab, setActiveTab] = useState('active');
   const [archivingTeacher, setArchivingTeacher] = useState(null);
@@ -88,7 +97,6 @@ const ManagerModal = ({
   const [allYearsRecords, setAllYearsRecords] = useState([]);
   const [isLoadingAllYears, setIsLoadingAllYears] = useState(false);
 
-  // When archive tab is opened, load ALL available years so record counts are accurate
   useEffect(() => {
     if (activeTab !== 'archive' || !loadYearData || availableYears.length === 0) return;
 
@@ -97,7 +105,6 @@ const ManagerModal = ({
       try {
         const results = await Promise.all(availableYears.map(y => loadYearData(y)));
         const combined = results.flat().filter(Boolean);
-        // Deduplicate by id
         const seen = new Set();
         const deduped = combined.filter(r => {
           if (!r.id || seen.has(r.id)) return false;
@@ -130,7 +137,6 @@ const ManagerModal = ({
     setIsProcessing(false);
   };
 
-  // ─── Leave Types Mode ─────────────────────────────────────────────────────
   if (showManager !== 'teachers') {
     return (
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-fade-in">
@@ -179,7 +185,6 @@ const ManagerModal = ({
     );
   }
 
-  // ─── Teacher Management Mode ──────────────────────────────────────────────
   return (
     <>
       {archivingTeacher && (
@@ -193,7 +198,6 @@ const ManagerModal = ({
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-fade-in">
         <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md max-h-[88vh] flex flex-col overflow-hidden border border-white/20">
 
-          {/* Header */}
           <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-2xl bg-blue-100 text-blue-600"><User size={24}/></div>
@@ -205,7 +209,6 @@ const ManagerModal = ({
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-xl transition-all"><X size={24}/></button>
           </div>
 
-          {/* Tab Switcher */}
           <div className="px-8 pt-5 pb-4 bg-white border-b border-slate-50">
             <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
               <button
@@ -227,7 +230,6 @@ const ManagerModal = ({
             </div>
           </div>
 
-          {/* ── Active Teachers ── */}
           {activeTab === 'active' && (
             <>
               <div className="px-8 py-4 bg-white border-b border-slate-50">
@@ -247,34 +249,22 @@ const ManagerModal = ({
                 </div>
               </div>
               <div className="flex-grow overflow-y-auto p-8 space-y-3 bg-slate-50/50">
-                {sortedTeachers.length === 0 && (
-                  <div className="text-center py-10"><p className="text-slate-300 font-bold text-sm">目前暂无在职教师</p></div>
-                )}
                 {sortedTeachers.map(item => (
                   <div key={item} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm group hover:border-amber-200 transition-all">
                     <span className="font-black text-slate-700 text-sm tracking-tight">{item}</span>
-                    <button
-                      onClick={() => setArchivingTeacher(item)}
-                      disabled={isProcessing}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all text-[10px] font-black uppercase"
-                      title="归档此教师（保留历史记录）"
-                    >
-                      <Archive size={14}/> 归档
-                    </button>
+                    <button onClick={() => setArchivingTeacher(item)} disabled={isProcessing} className="flex items-center gap-1.5 px-3 py-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all text-[10px] font-black uppercase"><Archive size={14}/> 归档</button>
                   </div>
                 ))}
               </div>
             </>
           )}
 
-          {/* ── Archive Area ── */}
           {activeTab === 'archive' && (
             <div className="flex-grow overflow-y-auto p-8 space-y-3 bg-slate-50/50">
               {archivedTeachers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300"><Archive size={32}/></div>
                   <p className="text-slate-400 font-black text-sm">档案区目前为空</p>
-                  <p className="text-slate-300 font-bold text-xs text-center">归档的教师将显示在这里<br/>其历史请假记录将被完整保留</p>
                 </div>
               ) : (
                 <>
@@ -289,16 +279,10 @@ const ManagerModal = ({
                         name={name}
                         allRecords={allYearsRecords}
                         isLoadingAllYears={isLoadingAllYears}
+                        baselineValue={baselineCuti[name.trim().toUpperCase()]}
                       />
                       <div className="flex justify-end pt-1 pb-2 pr-1">
-                        <button
-                          onClick={() => handleRestore(name)}
-                          disabled={isProcessing}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-all text-[10px] font-black uppercase"
-                          title="恢复此教师到在职名单"
-                        >
-                          <RotateCcw size={13}/> 恢复到在职名单
-                        </button>
+                        <button onClick={() => handleRestore(name)} disabled={isProcessing} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-all text-[10px] font-black uppercase"><RotateCcw size={13}/> 恢复到在职名单</button>
                       </div>
                     </div>
                   ))}
