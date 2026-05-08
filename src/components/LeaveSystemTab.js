@@ -28,11 +28,12 @@ const LeaveSystemTab = ({
   copyAndSave,
   setShowHistory,
   setShowManager,
-  historyRecords
+  historyRecords,
+  setRecordToDelete
 }) => {
   return (
     <div className="space-y-6">
-      <DailyLeaveInspector historyRecords={historyRecords} />
+      <DailyLeaveInspector historyRecords={historyRecords} setRecordToDelete={setRecordToDelete} />
 
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">

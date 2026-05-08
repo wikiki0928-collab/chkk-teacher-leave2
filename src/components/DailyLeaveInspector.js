@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { UserCheck, Calendar, X } from 'lucide-react';
+import { UserCheck, Calendar, X, Trash2 } from 'lucide-react';
 import { isDateInRange, enrichDateInfoWithDay, getRecordCategory, getTodayYMD } from '../utils/helpers';
-import { Pencil } from 'lucide-react';
 
-const DailyLeaveInspector = ({ historyRecords }) => {
+const DailyLeaveInspector = ({ historyRecords, setRecordToDelete }) => {
   const [selectedDate, setSelectedDate] = useState(getTodayYMD());
   const dateInputRef = React.useRef(null);
 
@@ -96,7 +95,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
                {cutiRecords.map((rec, index) => (
                  <div 
                    key={rec.id} 
-                   className="group bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-orange-100 hover:shadow-xl hover:shadow-orange-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
+                    className="group relative bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-orange-100 hover:shadow-xl hover:shadow-orange-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
                  >
                    <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-sm font-black text-orange-500 shadow-sm group-hover:scale-110 transition-transform">
                      {index + 1}
@@ -112,6 +111,13 @@ const DailyLeaveInspector = ({ historyRecords }) => {
                        {enrichDateInfoWithDay(rec.dateInfo)}
                      </p>
                    </div>
+                    <button
+                      onClick={() => setRecordToDelete?.(rec)}
+                      className="absolute right-4 top-4 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                      title="删除记录"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                  </div>
                ))}
              </div>
@@ -128,7 +134,7 @@ const DailyLeaveInspector = ({ historyRecords }) => {
                {rasmiRecords.map((rec, index) => (
                  <div 
                    key={rec.id} 
-                   className="group bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
+                    className="group relative bg-slate-50/50 hover:bg-white border border-slate-100 hover:border-emerald-100 hover:shadow-xl hover:shadow-emerald-500/5 p-6 rounded-[24px] transition-all flex items-start gap-5"
                  >
                    <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-sm font-black text-emerald-500 shadow-sm group-hover:scale-110 transition-transform">
                      {index + 1}
@@ -144,6 +150,13 @@ const DailyLeaveInspector = ({ historyRecords }) => {
                        {enrichDateInfoWithDay(rec.dateInfo)}
                      </p>
                    </div>
+                    <button
+                      onClick={() => setRecordToDelete?.(rec)}
+                      className="absolute right-4 top-4 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                      title="删除记录"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                  </div>
                ))}
              </div>

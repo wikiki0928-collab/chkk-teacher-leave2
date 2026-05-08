@@ -449,6 +449,7 @@ export default function App() {
             setShowHistory={setShowHistory}
             setShowManager={setShowManager}
             historyRecords={historyRecords}
+            setRecordToDelete={setRecordToDelete}
           />
         )}
 
