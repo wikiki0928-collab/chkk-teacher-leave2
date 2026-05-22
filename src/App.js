@@ -75,7 +75,7 @@ export default function App() {
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");
   const [isSelesai, setIsSelesai] = useState(false);
-  const [copiedStatus, setCopiedStatus] = useState(false);
+  const [copiedStatus, setCopiedStatus] = useState(null); // 'copy' | 'save' | null
 
   const currentJsMonth = new Date().getMonth();
   const [statYear, setStatYear] = useState(new Date().getFullYear().toString());
@@ -93,10 +93,7 @@ export default function App() {
 
   const sortedTeachers = useMemo(() => [...teachersList].sort((a, b) => a.localeCompare(b)), [teachersList]);
 
-  useEffect(() => {
-    if (sortedTeachers.length > 0 && !selectedTeacher) setSelectedTeacher(sortedTeachers[0]);
-    if (leaveTypesList.length > 0 && !leaveType) setLeaveType(leaveTypesList[0]);
-  }, [sortedTeachers, leaveTypesList, selectedTeacher, leaveType]);
+
 
   // When statYear changes to a past year, load its data on demand
   const currentCalendarYear = new Date().getFullYear().toString();
@@ -107,6 +104,15 @@ export default function App() {
     }
     loadYearData(statYear);
   }, [statYear, loadYearData, currentCalendarYear]);
+
+  // When startDate or endDate spans a different year, load that year's data on demand for conflict detection
+  useEffect(() => {
+    if (!startDate || !endDate) return;
+    const startYear = startDate.substring(0, 4);
+    const endYear = endDate.substring(0, 4);
+    if (startYear) loadYearData(startYear);
+    if (endYear && endYear !== startYear) loadYearData(endYear);
+  }, [startDate, endDate, loadYearData]);
 
   const getDateLine = () => {
     const f = (d) => d.split("-").reverse().join(".");
@@ -127,7 +133,13 @@ export default function App() {
     return `${datePart} (${details.join(", ")})`;
   };
 
-  const finalMessage = `**${selectedTeacher}**\n${leaveType === "其他 (Lain-lain)" ? customLeaveType.toUpperCase() : leaveType}\n${getDateLine()}`;
+  const getLeaveTypeDisplay = () => {
+    if (!leaveType) return '[请选择请假种类]';
+    if (leaveType === "其他 (Lain-lain)") return customLeaveType ? customLeaveType.toUpperCase() : '[请输入请假种类]';
+    return leaveType;
+  };
+
+  const finalMessage = `**${selectedTeacher || '[请选择老师]'}**\n${getLeaveTypeDisplay()}\n${getDateLine()}`;
 
   const fallbackCopyTextToClipboard = (text) => {
     try {
@@ -147,7 +159,53 @@ export default function App() {
     }
   };
 
+  const copyOnly = async () => {
+    if (!selectedTeacher) {
+      showToast("⚠️ 请先选择一位老师！");
+      return;
+    }
+    if (!leaveType) {
+      showToast("⚠️ 请先选择请假种类！");
+      return;
+    }
+    if (leaveType === "其他 (Lain-lain)" && !customLeaveType.trim()) {
+      showToast("⚠️ 请输入具体请假种类！");
+      return;
+    }
+    let copySuccess = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(finalMessage);
+        copySuccess = true;
+      } else {
+        copySuccess = fallbackCopyTextToClipboard(finalMessage);
+      }
+    } catch (err) {
+      copySuccess = fallbackCopyTextToClipboard(finalMessage);
+    }
+
+    if (copySuccess) {
+      setCopiedStatus('copy');
+      setTimeout(() => setCopiedStatus(null), 2000);
+      showToast("✅ 已成功复制文本");
+    } else {
+      showToast("❌ 复制失败，请手动复制");
+    }
+  };
+
   const copyAndSave = async () => {
+    if (!selectedTeacher) {
+      showToast("⚠️ 请先选择一位老师！");
+      return;
+    }
+    if (!leaveType) {
+      showToast("⚠️ 请先选择请假种类！");
+      return;
+    }
+    if (leaveType === "其他 (Lain-lain)" && !customLeaveType.trim()) {
+      showToast("⚠️ 请输入具体请假种类！");
+      return;
+    }
     let copySuccess = false;
     
     // 1. 尝试复制文本 (通过 try-catch 单独包裹，避免因为 iframe 权限引起整个函数崩溃)
@@ -163,8 +221,8 @@ export default function App() {
     }
 
     if (copySuccess) {
-      setCopiedStatus(true);
-      setTimeout(() => setCopiedStatus(false), 2000);
+      setCopiedStatus('save');
+      setTimeout(() => setCopiedStatus(null), 2000);
     }
 
     // 2. 执行云端存档
@@ -379,39 +437,86 @@ export default function App() {
   const bulanString = bulanMelayu[parseInt(statMonth) - 1];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-12">
+    <div className="min-h-screen pb-16 relative">
       {toastMsg && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-white/95 backdrop-blur-md text-slate-900 px-8 py-4 rounded-2xl shadow-2xl font-bold text-sm animate-fade-in border border-slate-200">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-white/80 backdrop-blur-2xl text-slate-800 px-8 py-4.5 rounded-[24px] shadow-2xl shadow-indigo-500/10 font-black text-sm border border-white/90 flex items-center gap-3 animate-fade-in">
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+          </span>
           {toastMsg}
         </div>
       )}
 
       {/* Header Area */}
-      <div className="bg-white text-slate-900 pt-10 pb-20 px-4 border-b border-slate-100">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="pt-10 pb-12 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-white/40 backdrop-blur-md p-6 rounded-[32px] border border-white/60 shadow-lg shadow-slate-100/50">
           <div>
-            <h1 className="text-3xl font-black tracking-tight mb-2">老师请假管理系统 <span className="text-blue-600">v2.0</span></h1>
-            <p className="text-slate-500 font-medium">官方高清字体渲染 · 云端数据实时同步</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-indigo-550 to-violet-550/10 border border-indigo-100 rounded-full text-indigo-650 text-xs font-black tracking-wider uppercase mb-3 select-none">
+              ✨ Premium Edition
+            </div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl flex items-center gap-3">
+              老师请假管理系统
+              <span className="text-xs px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold rounded-lg shadow-sm shadow-indigo-600/20">v2.0</span>
+            </h1>
+            <p className="text-slate-500 font-bold mt-2 flex items-center gap-2 text-xs">
+              官方高清字体渲染 <span className="w-1.5 h-1.5 rounded-full bg-indigo-300"></span> 云端数据实时同步
+            </p>
           </div>
           
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar">
-            <button onClick={() => setActiveTab('leave')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'leave' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
-              <Briefcase size={16}/> 请假登记
+          <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-[22px] border border-white/80 shadow-md shadow-indigo-150/5 overflow-x-auto no-scrollbar">
+            <button 
+              onClick={() => setActiveTab('leave')} 
+              className={`flex items-center gap-2.5 py-3.5 px-6 rounded-[18px] font-black text-sm transition-all duration-300 whitespace-nowrap active:scale-[0.97] ${
+                activeTab === 'leave' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/15' 
+                  : 'text-slate-550 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Briefcase size={16} className={activeTab === 'leave' ? 'animate-pulse' : ''} />
+              请假登记
             </button>
-            <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
-              <BarChart3 size={16}/> 数据统计
+            
+            <button 
+              onClick={() => setActiveTab('stats')} 
+              className={`flex items-center gap-2.5 py-3.5 px-6 rounded-[18px] font-black text-sm transition-all duration-300 whitespace-nowrap active:scale-[0.97] ${
+                activeTab === 'stats' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/15' 
+                  : 'text-slate-550 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <BarChart3 size={16} className={activeTab === 'stats' ? 'animate-pulse' : ''} />
+              数据统计
             </button>
-            <button onClick={() => setActiveTab('calendar')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'calendar' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
-              <Calendar size={16}/> 请假日历
+            
+            <button 
+              onClick={() => setActiveTab('calendar')} 
+              className={`flex items-center gap-2.5 py-3.5 px-6 rounded-[18px] font-black text-sm transition-all duration-300 whitespace-nowrap active:scale-[0.97] ${
+                activeTab === 'calendar' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/15' 
+                  : 'text-slate-550 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Calendar size={16} className={activeTab === 'calendar' ? 'animate-pulse' : ''} />
+              请假日历
             </button>
-            <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pdf' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900'}`}>
-              <FileImage size={16}/> PDF转换
+            
+            <button 
+              onClick={() => setActiveTab('pdf')} 
+              className={`flex items-center gap-2.5 py-3.5 px-6 rounded-[18px] font-black text-sm transition-all duration-300 whitespace-nowrap active:scale-[0.97] ${
+                activeTab === 'pdf' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/15' 
+                  : 'text-slate-550 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <FileImage size={16} className={activeTab === 'pdf' ? 'animate-pulse' : ''} />
+              PDF转换
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto -mt-10 px-4 space-y-8 animate-fade-in">
+      <div className="max-w-6xl mx-auto px-6 space-y-8 animate-fade-in">
         {activeTab === 'leave' && (
           <LeaveSystemTab 
             user={user}
@@ -445,11 +550,13 @@ export default function App() {
             setIsSelesai={setIsSelesai}
             copiedStatus={copiedStatus}
             finalMessage={finalMessage}
+            copyOnly={copyOnly}
             copyAndSave={copyAndSave}
             setShowHistory={setShowHistory}
             setShowManager={setShowManager}
             historyRecords={historyRecords}
             setRecordToDelete={setRecordToDelete}
+            showToast={showToast}
           />
         )}
 
